@@ -1,0 +1,800 @@
+<!doctype html>
+<html lang="en">
+<head>
+  <meta charset="utf-8" />
+  <meta name="viewport" content="width=device-width,initial-scale=1" />
+  <title>HVRX Orbital Platform</title>
+
+  <!-- Prevent favicon 404 noise -->
+  <link rel="icon" href="data:," />
+
+  <!-- Font -->
+  <link rel="preconnect" href="https://fonts.googleapis.com">
+  <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
+  <link href="https://fonts.googleapis.com/css2?family=Montserrat:wght@400;600;800&display=swap" rel="stylesheet">
+
+  <style>
+    :root{
+      --bg:#000000;
+      --panel:rgba(10, 14, 28, 0.68);
+      --panel2:rgba(10, 14, 28, 0.82);
+      --stroke:rgba(120, 160, 255, 0.22);
+      --text:#EAF1FF;
+      --muted:#9FB3D9;
+
+      /* Brand */
+      --nebulaViolet:#7A5CFF;
+      --stellarCyan:#00E6FF;
+      --solarGold:#FFCC33;
+
+      --btnGrad: linear-gradient(90deg, rgba(122,92,255,1), rgba(0,230,255,1));
+      --shadow: 0 10px 30px rgba(0,0,0,.45);
+    }
+
+    html, body { margin:0; height:100%; overflow:hidden; background:var(--bg); font-family:Montserrat,system-ui,-apple-system,Segoe UI,Roboto,Arial,sans-serif; }
+    #app { position:fixed; inset:0; }
+
+    #c {
+      position:fixed; inset:0;
+      width:100vw; height:100vh;
+      display:block;
+      background:#000;
+    }
+
+    .panel{
+      position:fixed;
+      top:18px;
+      width:320px;
+      background:var(--panel);
+      border:1px solid var(--stroke);
+      border-radius:14px;
+      box-shadow:var(--shadow);
+      backdrop-filter: blur(10px);
+      -webkit-backdrop-filter: blur(10px);
+      color:var(--text);
+      overflow:hidden;
+    }
+    .panel.left{ left:18px; }
+    .panel.right{ right:18px; width:320px; }
+
+    .panelHeader{
+      padding:14px 14px 10px;
+      border-bottom:1px solid rgba(120,160,255,.14);
+      background:linear-gradient(180deg, rgba(16,20,40,.65), rgba(16,20,40,.25));
+    }
+    .title{
+      font-weight:800;
+      letter-spacing:1.6px;
+      font-size:14px;
+      text-transform:uppercase;
+      color:rgba(234,241,255,.95);
+    }
+    .subtitle{
+      margin-top:6px;
+      font-size:12px;
+      color:rgba(159,179,217,.95);
+      line-height:1.2;
+    }
+
+    .panelBody{ padding:12px 14px 14px; }
+
+    label{
+      display:block;
+      font-size:11px;
+      letter-spacing:.6px;
+      color:rgba(159,179,217,.95);
+      margin:10px 0 6px;
+      text-transform:none;
+    }
+    input, textarea{
+      width:100%;
+      box-sizing:border-box;
+      padding:10px 10px;
+      border-radius:10px;
+      border:1px solid rgba(120,160,255,.18);
+      background:rgba(0,0,0,.35);
+      color:var(--text);
+      outline:none;
+      font-family:inherit;
+      font-size:12px;
+    }
+    input::placeholder, textarea::placeholder{ color:rgba(159,179,217,.65); }
+    textarea{ min-height:90px; resize:vertical; }
+
+    .row{ display:flex; gap:10px; }
+    .row > div{ flex:1; }
+
+    .btn{
+      width:100%;
+      margin-top:12px;
+      padding:12px 12px;
+      border-radius:12px;
+      border:0;
+      cursor:pointer;
+      font-weight:800;
+      letter-spacing:1px;
+      color:#06101C;
+      background:var(--btnGrad);
+      box-shadow:0 10px 22px rgba(0,230,255,.12), 0 10px 22px rgba(122,92,255,.10);
+      text-transform:uppercase;
+      font-size:12px;
+    }
+    .btn:active{ transform: translateY(1px); }
+    .btn.secondary{
+      background:rgba(0,0,0,.35);
+      color:var(--text);
+      border:1px solid rgba(0,230,255,.20);
+      box-shadow:none;
+      text-transform:none;
+      font-weight:700;
+      letter-spacing:.6px;
+    }
+
+    .note{
+      margin-top:10px;
+      font-size:11px;
+      color:rgba(159,179,217,.9);
+      line-height:1.3;
+    }
+    .chip{
+      display:inline-block;
+      font-size:10px;
+      padding:4px 8px;
+      border-radius:999px;
+      border:1px solid rgba(255,204,51,.20);
+      color:rgba(255,204,51,.95);
+      background:rgba(255,204,51,.08);
+      margin-top:8px;
+    }
+
+    .satList{
+      margin-top:10px;
+      border-top:1px solid rgba(120,160,255,.12);
+      padding-top:10px;
+      max-height:42vh;
+      overflow:auto;
+    }
+    .satItem{
+      display:flex; align-items:center; justify-content:space-between;
+      padding:9px 10px;
+      border-radius:10px;
+      border:1px solid rgba(120,160,255,.14);
+      background:rgba(0,0,0,.25);
+      margin-bottom:8px;
+      cursor:pointer;
+      user-select:none;
+    }
+    .satItem:hover{ border-color:rgba(0,230,255,.28); }
+    .satName{
+      font-size:12px;
+      font-weight:700;
+      color:rgba(234,241,255,.95);
+      max-width:220px;
+      overflow:hidden;
+      text-overflow:ellipsis;
+      white-space:nowrap;
+    }
+    .pill{
+      font-size:10px;
+      padding:4px 8px;
+      border-radius:999px;
+      border:1px solid rgba(0,230,255,.22);
+      color:rgba(0,230,255,.95);
+      background:rgba(0,230,255,.08);
+    }
+
+    .infoBox{
+      margin-top:10px;
+      padding:10px;
+      border-radius:12px;
+      border:1px solid rgba(120,160,255,.14);
+      background:rgba(0,0,0,.22);
+      color:rgba(234,241,255,.92);
+      font-size:12px;
+      line-height:1.35;
+    }
+    .infoRow{ display:flex; justify-content:space-between; gap:10px; }
+    .infoK{ color:rgba(159,179,217,.92); font-weight:700; }
+    .infoV{ color:rgba(234,241,255,.95); font-weight:800; text-align:right; }
+
+    #hud{
+      position:fixed;
+      left:50%;
+      transform:translateX(-50%);
+      bottom:18px;
+      background:var(--panel2);
+      border:1px solid rgba(120,160,255,.18);
+      color:var(--text);
+      border-radius:999px;
+      padding:10px 14px;
+      box-shadow:var(--shadow);
+      font-size:12px;
+      display:flex;
+      gap:12px;
+      align-items:center;
+      backdrop-filter: blur(10px);
+      -webkit-backdrop-filter: blur(10px);
+    }
+    #hud .k{ color:rgba(159,179,217,.95); font-weight:700; }
+    #hud .v{ color:rgba(234,241,255,.95); font-weight:800; letter-spacing:.2px; }
+    #hud .dot{ width:6px; height:6px; border-radius:50%; background:var(--stellarCyan); box-shadow:0 0 10px rgba(0,230,255,.6); }
+
+    @media (max-width: 980px){
+      .panel.right{ display:none; }
+      .panel.left{ width:340px; }
+    }
+  </style>
+</head>
+
+<body>
+  <div id="app">
+    <canvas id="c"></canvas>
+
+    <div class="panel left">
+      <div class="panelHeader">
+        <div class="title">HVRX ORBITAL PLATFORM</div>
+        <div class="subtitle">3D technical Earth + satellite reference. Load TLEs from Wix Velo endpoint, or use built-in sample set.</div>
+        <div class="chip">MVP — functional demo</div>
+      </div>
+
+      <div class="panelBody">
+        <label>Wix TLE Endpoint</label>
+        <input id="tleUrl" placeholder="https://your-wix-domain.com/_functions/tles" />
+
+        <button id="loadBtn" class="btn">Load Satellites</button>
+        <button id="sampleBtn" class="btn secondary">Use Built-In Sample TLEs</button>
+
+        <div class="row">
+          <div>
+            <label>Launch Site (lat, lon)</label>
+            <input id="launchLatLon" value="28.3922,-80.6077" />
+          </div>
+        </div>
+
+        <div class="row">
+          <div>
+            <label>Target Inclination (deg)</label>
+            <input id="targetInc" value="51.6" />
+          </div>
+          <div>
+            <label>Target Altitude (km)</label>
+            <input id="targetAlt" value="400" />
+          </div>
+        </div>
+
+        <label>Target Ascending Node Longitude (deg)</label>
+        <input id="targetLan" value="-80" />
+
+        <button id="launchBtn" class="btn">Compute Launch Windows</button>
+
+        <label>Launch Windows (UTC)</label>
+        <textarea id="launchOut" placeholder="Windows will appear here..."></textarea>
+
+        <div class="note">
+          Note: Launch planner is a simplified alignment model for MVP (good for “reference feel”).
+          Satellites require a real TLE endpoint (or sample TLEs).
+        </div>
+      </div>
+    </div>
+
+    <div class="panel right">
+      <div class="panelHeader">
+        <div class="title">SATELLITES</div>
+        <div class="subtitle">Search and select. Tracks render for ~90 minutes ahead.</div>
+      </div>
+
+      <div class="panelBody">
+        <label>Search by name</label>
+        <input id="search" placeholder="e.g., ISS, STARLINK, NOAA..." />
+        <div class="satList" id="satList"></div>
+
+        <div class="infoBox" id="satInfo">
+          <div class="infoRow"><span class="infoK">Selected</span><span class="infoV" id="infoName">—</span></div>
+          <div class="infoRow"><span class="infoK">Lat</span><span class="infoV" id="infoLat">—</span></div>
+          <div class="infoRow"><span class="infoK">Lon</span><span class="infoV" id="infoLon">—</span></div>
+          <div class="infoRow"><span class="infoK">Alt (km)</span><span class="infoV" id="infoAlt">—</span></div>
+          <div class="infoRow"><span class="infoK">Speed (km/s)</span><span class="infoV" id="infoSpd">—</span></div>
+          <div class="infoRow"><span class="infoK">UTC</span><span class="infoV" id="infoUtc">—</span></div>
+        </div>
+      </div>
+    </div>
+
+    <div id="hud">
+      <span class="dot"></span>
+      <span class="k">STATUS</span><span class="v" id="status">READY</span>
+      <span class="k">SAT</span><span class="v" id="satCount">0</span>
+      <span class="k">SELECTED</span><span class="v" id="selectedName">—</span>
+    </div>
+  </div>
+
+  <!-- satellite.js as a GLOBAL (avoids CORS/module issues) -->
+  <script src="https://cdn.jsdelivr.net/npm/satellite.js@5.0.1/dist/satellite.min.js"></script>
+
+  <!-- Everything else as ES modules (fixes OrbitControls + deprecation issues) -->
+  <script type="module">
+    import * as THREE from "https://unpkg.com/three@0.160.0/build/three.module.js";
+    import { OrbitControls } from "https://unpkg.com/three@0.160.0/examples/jsm/controls/OrbitControls.js";
+
+    // -----------------------------
+    // Scene / Camera / Renderer
+    // -----------------------------
+    const canvas = document.getElementById("c");
+    const renderer = new THREE.WebGLRenderer({ canvas, antialias: true, alpha: false });
+    renderer.setPixelRatio(Math.min(window.devicePixelRatio || 1, 2));
+    renderer.setSize(window.innerWidth, window.innerHeight);
+    renderer.outputColorSpace = THREE.SRGBColorSpace;
+
+    const scene = new THREE.Scene();
+    scene.background = new THREE.Color(0x000000);
+
+    const camera = new THREE.PerspectiveCamera(45, window.innerWidth / window.innerHeight, 0.1, 3000);
+    camera.position.set(0, 0, 260);
+    camera.lookAt(0, 0, 0);
+
+    const controls = new OrbitControls(camera, renderer.domElement);
+    controls.enableDamping = true;
+    controls.dampingFactor = 0.06;
+    controls.minDistance = 140;
+    controls.maxDistance = 700;
+    controls.target.set(0, 0, 0);
+
+    window.addEventListener("resize", () => {
+      const w = window.innerWidth;
+      const h = window.innerHeight;
+      renderer.setSize(w, h);
+      camera.aspect = w / h;
+      camera.updateProjectionMatrix();
+    });
+
+    // -----------------------------
+    // Brand colors
+    // -----------------------------
+    const COLORS = {
+      nebulaViolet: 0x7A5CFF,
+      stellarCyan:  0x00E6FF,
+      solarGold:    0xFFCC33
+    };
+
+    // -----------------------------
+    // Lighting
+    // -----------------------------
+    const key = new THREE.DirectionalLight(0xffffff, 1.0);
+    key.position.set(1.2, 0.6, 1.0);
+    scene.add(key);
+
+    const rim = new THREE.DirectionalLight(0xffffff, 0.6);
+    rim.position.set(-1.2, -0.3, -1.0);
+    scene.add(rim);
+
+    const fill = new THREE.AmbientLight(0xffffff, 0.28);
+    scene.add(fill);
+
+    // -----------------------------
+    // Stars
+    // -----------------------------
+    function makeStarfield(count = 2000){
+      const geo = new THREE.BufferGeometry();
+      const pts = [];
+      for (let i=0; i<count; i++){
+        const r = 1200 + Math.random() * 900;
+        const u = Math.random()*2 - 1;
+        const a = Math.random()*Math.PI*2;
+        const t = Math.acos(u);
+        const x = r * Math.sin(t) * Math.cos(a);
+        const y = r * Math.sin(t) * Math.sin(a);
+        const z = r * Math.cos(t);
+        pts.push(x,y,z);
+      }
+      geo.setAttribute("position", new THREE.Float32BufferAttribute(pts, 3));
+      const mat = new THREE.PointsMaterial({ color: 0xffffff, size: 1.1, transparent:true, opacity:0.85 });
+      return new THREE.Points(geo, mat);
+    }
+    scene.add(makeStarfield(2000));
+
+    // -----------------------------
+    // Earth
+    // -----------------------------
+    const R = 100;
+    const earthGeom = new THREE.SphereGeometry(R, 96, 96);
+    const tex = new THREE.TextureLoader();
+
+    // Stable texture URLs (avoid 404s)
+    const EARTH_BASE = "https://cdn.jsdelivr.net/gh/mrdoob/three.js@r160/examples/textures/planets/";
+    const earthDay  = tex.load(EARTH_BASE + "earth_atmos_2048.jpg");
+    const earthBump = tex.load(EARTH_BASE + "earth_bump_2048.jpg");
+    const earthSpec = tex.load(EARTH_BASE + "earth_specular_2048.jpg");
+    earthDay.colorSpace = THREE.SRGBColorSpace;
+
+    const earthMat = new THREE.MeshPhongMaterial({
+      map: earthDay,
+      bumpMap: earthBump,
+      bumpScale: 0.7,
+      specularMap: earthSpec,
+      specular: new THREE.Color(0x222222),
+      shininess: 10
+    });
+
+    const earth = new THREE.Mesh(earthGeom, earthMat);
+    scene.add(earth);
+
+    const atmoGeom = new THREE.SphereGeometry(R * 1.02, 96, 96);
+    const atmoMat = new THREE.MeshBasicMaterial({ color: COLORS.stellarCyan, transparent:true, opacity:0.05 });
+    const atmo = new THREE.Mesh(atmoGeom, atmoMat);
+    scene.add(atmo);
+
+    const gridGroup = new THREE.Group();
+    scene.add(gridGroup);
+
+    const degToRad = (d) => d * Math.PI / 180;
+    const radToDeg = (r) => r * 180 / Math.PI;
+
+    function makeCircle(latDeg, color, opacity){
+      const lat = degToRad(latDeg);
+      const r = Math.cos(lat) * (R + 0.7);
+      const y = Math.sin(lat) * (R + 0.7);
+      const pts = [];
+      const seg = 256;
+      for (let i=0; i<=seg; i++){
+        const a = (i/seg) * Math.PI * 2;
+        pts.push(new THREE.Vector3(Math.cos(a)*r, y, Math.sin(a)*r));
+      }
+      const geo = new THREE.BufferGeometry().setFromPoints(pts);
+      const mat = new THREE.LineBasicMaterial({ color, transparent:true, opacity });
+      return new THREE.Line(geo, mat);
+    }
+
+    function makeMeridian(lonDeg, color, opacity){
+      const lon = degToRad(lonDeg);
+      const pts = [];
+      const seg = 256;
+      for (let i=0; i<=seg; i++){
+        const t = (i/seg) * Math.PI - (Math.PI/2);
+        const x = Math.cos(t) * Math.cos(lon) * (R + 0.7);
+        const y = Math.sin(t) * (R + 0.7);
+        const z = Math.cos(t) * Math.sin(lon) * (R + 0.7);
+        pts.push(new THREE.Vector3(x,y,z));
+      }
+      const geo = new THREE.BufferGeometry().setFromPoints(pts);
+      const mat = new THREE.LineBasicMaterial({ color, transparent:true, opacity });
+      return new THREE.Line(geo, mat);
+    }
+
+    for (let lat=-75; lat<=75; lat+=15){
+      gridGroup.add(makeCircle(lat, COLORS.stellarCyan, lat===0 ? 0.35 : 0.22));
+    }
+    for (let lon=0; lon<360; lon+=15){
+      gridGroup.add(makeMeridian(lon, COLORS.stellarCyan, 0.18));
+    }
+
+    const axisMat = new THREE.LineBasicMaterial({ color: COLORS.nebulaViolet, transparent:true, opacity:0.18 });
+    const axisGeo = new THREE.BufferGeometry().setFromPoints([new THREE.Vector3(0, -140, 0), new THREE.Vector3(0, 140, 0)]);
+    scene.add(new THREE.Line(axisGeo, axisMat));
+
+    // -----------------------------
+    // Satellite rendering
+    // -----------------------------
+    const satGroup = new THREE.Group();
+    const trackGroup = new THREE.Group();
+    scene.add(satGroup);
+    scene.add(trackGroup);
+
+    const satGeom = new THREE.SphereGeometry(0.9, 10, 10);
+    const satMatDefault = new THREE.MeshBasicMaterial({ color: COLORS.solarGold });
+    const satMatSelected = new THREE.MeshBasicMaterial({ color: COLORS.stellarCyan });
+
+    const TRACK_DEFAULT = COLORS.nebulaViolet;
+    const TRACK_SELECTED = COLORS.solarGold;
+
+    let sats = [];
+    let selected = null;
+
+    const EARTH_KM = 6371;
+    const SCALE = R / EARTH_KM;
+
+    function eciToScene(posKm){
+      return new THREE.Vector3(posKm.x * SCALE, posKm.z * SCALE, posKm.y * SCALE);
+    }
+
+    function clearSats(){
+      while (satGroup.children.length) satGroup.remove(satGroup.children[0]);
+      while (trackGroup.children.length) trackGroup.remove(trackGroup.children[0]);
+      sats = [];
+      selected = null;
+      setSelectedName("—");
+      updateSatCount();
+      renderSatList();
+      setSatInfoEmpty();
+    }
+
+    function updateSatCount(){
+      document.getElementById("satCount").textContent = String(sats.length);
+    }
+    function setStatus(s){
+      document.getElementById("status").textContent = s;
+    }
+    function setSelectedName(s){
+      document.getElementById("selectedName").textContent = s;
+    }
+
+    function buildTrackLineECEF(satrec, minutesAhead = 90, stepMin = 2){
+      const pts = [];
+      const now = new Date();
+      for (let m = 0; m <= minutesAhead; m += stepMin){
+        const t = new Date(now.getTime() + m*60*1000);
+        const pv = satellite.propagate(satrec, t);
+        if (!pv.position) continue;
+
+        const gmst = satellite.gstime(t);
+        const ecf = satellite.eciToEcf(pv.position, gmst);
+        pts.push(eciToScene(ecf));
+      }
+      const geo = new THREE.BufferGeometry().setFromPoints(pts);
+      const mat = new THREE.LineBasicMaterial({ color: TRACK_DEFAULT, transparent:true, opacity:0.35 });
+      return new THREE.Line(geo, mat);
+    }
+
+    function addSat({name, tle1, tle2}){
+      const satrec = satellite.twoline2satrec(tle1, tle2);
+
+      const mesh = new THREE.Mesh(satGeom, satMatDefault.clone());
+      mesh.userData.name = name;
+      satGroup.add(mesh);
+
+      const track = buildTrackLineECEF(satrec, 90, 2);
+      trackGroup.add(track);
+
+      sats.push({ name, tle1, tle2, satrec, mesh, trackLine: track });
+    }
+
+    const SAMPLE_TLES = [
+      {
+        name: "ISS (ZARYA)",
+        tle1: "1 25544U 98067A   24060.53143519  .00012925  00000+0  23103-3 0  9993",
+        tle2: "2 25544  51.6417  75.5720 0004195  93.2871  43.0120 15.50094131439139"
+      },
+      {
+        name: "HUBBLE",
+        tle1: "1 20580U 90037B   24059.90548624  .00000679  00000+0  28557-4 0  9997",
+        tle2: "2 20580  28.4691  50.1306 0002679  67.4635 292.6714 15.09416616307122"
+      },
+      {
+        name: "NOAA 19",
+        tle1: "1 33591U 09005A   24060.53861383  .00000080  00000+0  77769-4 0  9993",
+        tle2: "2 33591  99.1737  65.3426 0013872  87.7186 272.5564 14.12418440776428"
+      },
+      {
+        name: "STARLINK-30000 (DEMO)",
+        tle1: "1 54000U 22100A   24060.50000000  .00001234  00000+0  12345-3 0  9991",
+        tle2: "2 54000  53.0000 120.0000 0001200  80.0000 280.0000 15.05500000  9990"
+      }
+    ];
+
+    const satListEl = document.getElementById("satList");
+    const searchEl = document.getElementById("search");
+
+    function escapeHtml(str){
+      return str.replace(/[&<>"']/g, m => ({ "&":"&amp;","<":"&lt;",">":"&gt;",'"':"&quot;","'":"&#039;" }[m]));
+    }
+
+    function renderSatList(){
+      satListEl.innerHTML = "";
+      const q = (searchEl.value || "").trim().toLowerCase();
+      const filtered = sats.filter(s => s.name.toLowerCase().includes(q));
+      for (const s of filtered){
+        const row = document.createElement("div");
+        row.className = "satItem";
+        row.innerHTML = `
+          <div class="satName">${escapeHtml(s.name)}</div>
+          <div class="pill">TRACK</div>
+        `;
+        row.addEventListener("click", () => selectSat(s.name));
+        satListEl.appendChild(row);
+      }
+    }
+    searchEl.addEventListener("input", renderSatList);
+
+    function selectSat(name){
+      for (const s of sats){
+        s.mesh.material = satMatDefault.clone();
+        s.trackLine.material.opacity = 0.35;
+        s.trackLine.material.color.setHex(TRACK_DEFAULT);
+        s.trackLine.material.needsUpdate = true;
+      }
+
+      selected = sats.find(x => x.name === name) || null;
+
+      if (!selected){
+        setSelectedName("—");
+        setSatInfoEmpty();
+        return;
+      }
+
+      selected.mesh.material = satMatSelected.clone();
+      selected.trackLine.material.opacity = 0.85;
+      selected.trackLine.material.color.setHex(TRACK_SELECTED);
+      selected.trackLine.material.needsUpdate = true;
+
+      setSelectedName(selected.name);
+      document.getElementById("infoName").textContent = selected.name;
+
+      controls.target.set(0,0,0);
+      controls.update();
+    }
+
+    function setSatInfoEmpty(){
+      document.getElementById("infoName").textContent = "—";
+      document.getElementById("infoLat").textContent = "—";
+      document.getElementById("infoLon").textContent = "—";
+      document.getElementById("infoAlt").textContent = "—";
+      document.getElementById("infoSpd").textContent = "—";
+      document.getElementById("infoUtc").textContent = "—";
+    }
+
+    function updateSelectedInfo(now){
+      if (!selected) return;
+
+      const pv = satellite.propagate(selected.satrec, now);
+      if (!pv.position || !pv.velocity) return;
+
+      const gmst = satellite.gstime(now);
+      const geo = satellite.eciToGeodetic(pv.position, gmst);
+
+      const lat = radToDeg(geo.latitude);
+      const lon = radToDeg(geo.longitude);
+      const alt = geo.height;
+
+      const v = pv.velocity;
+      const spd = Math.sqrt(v.x*v.x + v.y*v.y + v.z*v.z);
+
+      document.getElementById("infoLat").textContent = lat.toFixed(2) + "°";
+      document.getElementById("infoLon").textContent = lon.toFixed(2) + "°";
+      document.getElementById("infoAlt").textContent = alt.toFixed(0);
+      document.getElementById("infoSpd").textContent = spd.toFixed(2);
+      document.getElementById("infoUtc").textContent = now.toISOString().replace(".000Z","Z");
+    }
+
+    async function loadFromEndpoint(url){
+      setStatus("LOADING...");
+      try{
+        const res = await fetch(url, { cache: "no-store" });
+        if (!res.ok) throw new Error(`HTTP ${res.status}`);
+        const data = await res.json();
+
+        const list = Array.isArray(data) ? data : (data.satellites || []);
+        if (!Array.isArray(list) || list.length === 0) throw new Error("No satellites returned");
+
+        clearSats();
+
+        const capped = list.slice(0, 300);
+        for (const item of capped){
+          if (!item?.tle1 || !item?.tle2) continue;
+          addSat({ name: item.name || "UNKNOWN", tle1: item.tle1, tle2: item.tle2 });
+        }
+
+        updateSatCount();
+        renderSatList();
+        setStatus("ONLINE");
+      }catch(e){
+        console.error(e);
+        setStatus("ENDPOINT ERROR");
+        alert("Endpoint load failed. Use sample TLEs for now, or verify your Wix Velo function returns JSON { satellites:[{name,tle1,tle2}] }.");
+      }
+    }
+
+    function loadSample(){
+      setStatus("LOADING...");
+      clearSats();
+      for (const item of SAMPLE_TLES) addSat(item);
+      updateSatCount();
+      renderSatList();
+      setStatus("SAMPLE READY");
+      if (sats[0]) selectSat(sats[0].name);
+    }
+
+    document.getElementById("loadBtn").addEventListener("click", () => {
+      const url = document.getElementById("tleUrl").value.trim();
+      if (!url){
+        alert("Paste your Wix endpoint URL first, or click 'Use Built-In Sample TLEs'.");
+        return;
+      }
+      loadFromEndpoint(url);
+    });
+    document.getElementById("sampleBtn").addEventListener("click", loadSample);
+
+    function normLon(deg){
+      let x = deg % 360;
+      if (x > 180) x -= 360;
+      if (x < -180) x += 360;
+      return x;
+    }
+
+    function computeLaunchWindows(){
+      const out = document.getElementById("launchOut");
+      out.value = "";
+
+      const latLon = document.getElementById("launchLatLon").value.split(",").map(s => parseFloat(s.trim()));
+      const lat = latLon[0];
+      const lon = latLon[1];
+
+      const inc = parseFloat(document.getElementById("targetInc").value);
+      const altKm = parseFloat(document.getElementById("targetAlt").value);
+      const lan = parseFloat(document.getElementById("targetLan").value);
+
+      if (![lat,lon,inc,altKm,lan].every(Number.isFinite)){
+        out.value = "Invalid inputs.";
+        return;
+      }
+
+      const rotDegPerMin = 360 / (24*60);
+      const now = new Date();
+
+      const results = [];
+      for (let m=0; m<=48*60; m+=2){
+        const t = new Date(now.getTime() + m*60*1000);
+        const siteLonAtT = normLon(lon + rotDegPerMin * m);
+        const err = Math.abs(normLon(siteLonAtT - lan));
+
+        if (err < 0.8){
+          const feasible = Math.abs(lat) <= inc + 1e-6;
+          results.push({ t, err, feasible });
+          m += 10;
+        }
+      }
+
+      if (!results.length){
+        out.value = "No windows found in the next 48 hours with current thresholds.";
+        return;
+      }
+
+      out.value =
+        `Launch Site: ${lat.toFixed(4)}, ${lon.toFixed(4)}\n` +
+        `Target: inc=${inc.toFixed(2)}°, alt=${altKm.toFixed(0)} km, LAN=${lan.toFixed(2)}°\n\n` +
+        results.slice(0, 12).map((r,i) => {
+          const utc = r.t.toISOString().replace(".000Z","Z");
+          const tag = r.feasible ? "OK" : "DOGLEG";
+          return `${String(i+1).padStart(2,"0")}. ${utc}   (alignment ±${r.err.toFixed(2)}°)   [${tag}]`;
+        }).join("\n") +
+        `\n\nNotes:\n- [OK] means site latitude <= inclination.\n- [DOGLEG] suggests an out-of-plane maneuver may be required.\n- This is a simplified planner for MVP visuals.`;
+    }
+    document.getElementById("launchBtn").addEventListener("click", computeLaunchWindows);
+
+    function updateSatPositionsECEF(now){
+      if (!sats.length) return;
+
+      const gmstNow = satellite.gstime(now);
+      for (const s of sats){
+        const pv = satellite.propagate(s.satrec, now);
+        if (!pv.position) continue;
+
+        const ecf = satellite.eciToEcf(pv.position, gmstNow);
+        s.mesh.position.copy(eciToScene(ecf));
+      }
+    }
+
+    let lastT = performance.now();
+    let infoAccum = 0;
+
+    function animate(t){
+      const dt = Math.min(0.033, (t - lastT) / 1000);
+      lastT = t;
+
+      const now = new Date();
+
+      updateSatPositionsECEF(now);
+      controls.update();
+      renderer.render(scene, camera);
+
+      infoAccum += dt;
+      if (infoAccum >= 0.25){
+        infoAccum = 0;
+        updateSelectedInfo(now);
+      }
+
+      requestAnimationFrame(animate);
+    }
+    requestAnimationFrame(animate);
+
+    loadSample();
+  </script>
+</body>
+</html>
