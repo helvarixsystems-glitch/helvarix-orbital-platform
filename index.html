@@ -354,16 +354,16 @@
   import * as THREE from "three";
   import { OrbitControls } from "three/addons/controls/OrbitControls.js";
 
-    const satellite = window.satellite;
-    if (!satellite) {
- if (!satellite) {
-  const se = document.getElementById("status");
-  if (se) se.textContent = "SATELLITE.JS NOT LOADED";
-  alert('satellite.js did not load (window.satellite is undefined). Disable Cloudflare Rocket Loader OR keep data-cfasync="false" on the satellite.js tag.');
-  throw new Error("satellite.js not loaded");
-}
-    // UI helpers
-    const el = (id) => document.getElementById(id);
+  const satellite = window.satellite;
+  if (!satellite) {
+    const se = document.getElementById("status");
+    if (se) se.textContent = "SATELLITE.JS NOT LOADED";
+    alert('satellite.js did not load (window.satellite is undefined). Disable Cloudflare Rocket Loader OR keep data-cfasync="false" on the satellite.js tag.');
+    throw new Error("satellite.js not loaded");
+  }
+
+  // UI helpers
+  const el = (id) => document.getElementById(id);
     const statusEl = el("status");
     const satCountEl = el("satCount");
     const selectedNameEl = el("selectedName");
@@ -842,6 +842,7 @@
   </script>
 </body>
 </html>
+
 
 
 
