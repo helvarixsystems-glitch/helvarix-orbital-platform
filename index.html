@@ -349,32 +349,14 @@
 </script>
 
 <script type="module">
-  import * as THREE from "three";
-  import { OrbitControls } from "three/addons/controls/OrbitControls.js";
-
-  // IMPORTANT: satellite.js as a real ES module (no window.satellite, no Rocket Loader issues)
+  import * as THREE from "https://unpkg.com/three@0.160.0/build/three.module.js";
+  import { OrbitControls } from "https://unpkg.com/three@0.160.0/examples/jsm/controls/OrbitControls.js";
   import * as satellite from "https://esm.sh/satellite.js@5.0.1?bundle";
 
   // UI helpers
   const el = (id) => document.getElementById(id);
 
-  // Wait for satellite.js to exist (Rocket Loader / script ordering can delay it)
-  async function waitForSatellite(timeoutMs = 4000) {
-    const t0 = performance.now();
-    while (!window.satellite) {
-      if (performance.now() - t0 > timeoutMs) return null;
-      await new Promise(r => setTimeout(r, 50));
-    }
-    return window.satellite;
-  }
-
-  const satellite = await waitForSatellite();
-  if (!satellite) {
-    const se = el("status");
-    if (se) se.textContent = "SATELLITE.JS NOT LOADED";
-    alert("satellite.js did not load (window.satellite is undefined).");
-    throw new Error("satellite.js not loaded");
-  }
+ 
 
   // UI helpers (ONLY DECLARE THESE ONCE)
   const statusEl = el("status");
@@ -854,6 +836,7 @@
   </script>
 </body>
 </html>
+
 
 
 
