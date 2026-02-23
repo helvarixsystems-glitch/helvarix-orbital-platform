@@ -338,7 +338,9 @@
     </div>
   </div>
 
- <!-- Import map for THREE -->
+<!-- satellite.js as GLOBAL -->
+<script data-cfasync="false" src="https://cdn.jsdelivr.net/npm/satellite.js@5.0.1/dist/satellite.min.js"></script>
+
 <script type="importmap">
 {
   "imports": {
@@ -351,38 +353,46 @@
 <script type="module">
   import * as THREE from "three";
   import { OrbitControls } from "three/addons/controls/OrbitControls.js";
-  import * as satellite from "https://cdn.jsdelivr.net/npm/satellite.js@5.0.1/dist/satellite.es.js";
 
-  // UI helpers
   const el = (id) => document.getElementById(id);
+
+  // Wait for satellite.js to exist (Rocket Loader / script ordering can delay it)
+  async function waitForSatellite(timeoutMs = 4000) {
+    const t0 = performance.now();
+    while (!window.satellite) {
+      if (performance.now() - t0 > timeoutMs) return null;
+      await new Promise(r => setTimeout(r, 50));
+    }
+    return window.satellite;
+  }
+
+  const satellite = await waitForSatellite();
   if (!satellite) {
-    const se = document.getElementById("status");
+    const se = el("status");
     if (se) se.textContent = "SATELLITE.JS NOT LOADED";
-    alert('satellite.js did not load (window.satellite is undefined). Disable Cloudflare Rocket Loader OR keep data-cfasync="false" on the satellite.js tag.');
+    alert("satellite.js did not load (window.satellite is undefined).");
     throw new Error("satellite.js not loaded");
   }
 
-  // UI helpers
-  const el = (id) => document.getElementById(id);
-    const statusEl = el("status");
-    const satCountEl = el("satCount");
-    const selectedNameEl = el("selectedName");
-    const satListEl = el("satList");
-    const searchEl = el("search");
-    const catalogNoteEl = el("catalogNote");
-    const bodySelectEl = el("bodySelect");
+  // UI helpers (ONLY DECLARE THESE ONCE)
+  const statusEl = el("status");
+  const satCountEl = el("satCount");
+  const selectedNameEl = el("selectedName");
+  const satListEl = el("satList");
+  const searchEl = el("search");
+  const catalogNoteEl = el("catalogNote");
+  const bodySelectEl = el("bodySelect");
 
-    const infoName = el("infoName");
-    const infoLat  = el("infoLat");
-    const infoLon  = el("infoLon");
-    const infoAlt  = el("infoAlt");
-    const infoSpd  = el("infoSpd");
-    const infoUtc  = el("infoUtc");
+  const infoName = el("infoName");
+  const infoLat  = el("infoLat");
+  const infoLon  = el("infoLon");
+  const infoAlt  = el("infoAlt");
+  const infoSpd  = el("infoSpd");
+  const infoUtc  = el("infoUtc");
 
-    function setStatus(s){ statusEl.textContent = s; }
-    function setSelectedName(s){ selectedNameEl.textContent = s; infoName.textContent = s; }
-    function updateSatCount(n){ satCountEl.textContent = String(n); }
-
+  function setStatus(s){ statusEl.textContent = s; }
+  function setSelectedName(s){ selectedNameEl.textContent = s; infoName.textContent = s; }
+  function updateSatCount(n){ satCountEl.textContent = String(n); }
     // Three.js setup
     const canvas = el("c");
     const renderer = new THREE.WebGLRenderer({ canvas, antialias:true, alpha:true });
@@ -842,6 +852,7 @@
   </script>
 </body>
 </html>
+
 
 
 
