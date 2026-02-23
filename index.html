@@ -353,12 +353,9 @@
   import { OrbitControls } from "https://unpkg.com/three@0.160.0/examples/jsm/controls/OrbitControls.js";
   import * as satellite from "https://esm.sh/satellite.js@5.0.1?bundle";
 
-  // UI helpers
+  // ---------- UI helpers ----------
   const el = (id) => document.getElementById(id);
 
- 
-
-  // UI helpers (ONLY DECLARE THESE ONCE)
   const statusEl = el("status");
   const satCountEl = el("satCount");
   const selectedNameEl = el("selectedName");
@@ -377,465 +374,367 @@
   function setStatus(s){ statusEl.textContent = s; }
   function setSelectedName(s){ selectedNameEl.textContent = s; infoName.textContent = s; }
   function updateSatCount(n){ satCountEl.textContent = String(n); }
-    // Three.js setup
-    const canvas = el("c");
-    const renderer = new THREE.WebGLRenderer({ canvas, antialias:true, alpha:true });
-    renderer.setPixelRatio(Math.min(2, window.devicePixelRatio || 1));
-    renderer.setSize(window.innerWidth, window.innerHeight);
 
-    const scene = new THREE.Scene();
-    const camera = new THREE.PerspectiveCamera(45, window.innerWidth / window.innerHeight, 0.1, 5000);
-    camera.position.set(0, 0, 260);
+  // ---------- Three.js setup ----------
+  const canvas = el("c");
+  const renderer = new THREE.WebGLRenderer({ canvas, antialias:true, alpha:true });
+  renderer.setPixelRatio(Math.min(2, window.devicePixelRatio || 1));
+  renderer.setSize(window.innerWidth, window.innerHeight);
 
-    const controls = new OrbitControls(camera, renderer.domElement);
-    controls.enableDamping = true;
-    controls.dampingFactor = 0.06;
-    controls.target.set(0,0,0);
-    controls.minDistance = 140;
-    controls.maxDistance = 800;
+  const scene = new THREE.Scene();
+  const camera = new THREE.PerspectiveCamera(45, window.innerWidth / window.innerHeight, 0.1, 5000);
+  camera.position.set(0, 0, 260);
 
-    // Lights
-    scene.add(new THREE.AmbientLight(0xffffff, 0.85));
-    const sun = new THREE.DirectionalLight(0xffffff, 0.85);
-    sun.position.set(1, 0.4, 1);
-    scene.add(sun);
+  const controls = new OrbitControls(camera, renderer.domElement);
+  controls.enableDamping = true;
+  controls.dampingFactor = 0.06;
+  controls.target.set(0,0,0);
+  controls.minDistance = 140;
+  controls.maxDistance = 800;
 
-    // Stars
-    const starGeo = new THREE.BufferGeometry();
-    const starCount = 2000;
-    const starPos = new Float32Array(starCount * 3);
-    for (let i=0;i<starCount;i++){
-      const r = 2200 + Math.random()*1200;
-      const th = Math.random()*Math.PI*2;
-      const ph = Math.acos(2*Math.random()-1);
-      starPos[i*3+0] = r * Math.sin(ph)*Math.cos(th);
-      starPos[i*3+1] = r * Math.cos(ph);
-      starPos[i*3+2] = r * Math.sin(ph)*Math.sin(th);
-    }
-    starGeo.setAttribute("position", new THREE.BufferAttribute(starPos, 3));
-    scene.add(new THREE.Points(starGeo, new THREE.PointsMaterial({ color: 0xffffff, size: 2, sizeAttenuation: true })));
+  scene.add(new THREE.AmbientLight(0xffffff, 0.85));
+  const sun = new THREE.DirectionalLight(0xffffff, 0.85);
+  sun.position.set(1, 0.4, 1);
+  scene.add(sun);
 
-    // Earth
-    const R = 100;
-    const EARTH_KM = 6371;
-    const SCALE = R / EARTH_KM;
+  // Stars
+  const starGeo = new THREE.BufferGeometry();
+  const starCount = 2000;
+  const starPos = new Float32Array(starCount * 3);
+  for (let i=0;i<starCount;i++){
+    const r = 2200 + Math.random()*1200;
+    const th = Math.random()*Math.PI*2;
+    const ph = Math.acos(2*Math.random()-1);
+    starPos[i*3+0] = r * Math.sin(ph)*Math.cos(th);
+    starPos[i*3+1] = r * Math.cos(ph);
+    starPos[i*3+2] = r * Math.sin(ph)*Math.sin(th);
+  }
+  starGeo.setAttribute("position", new THREE.BufferAttribute(starPos, 3));
+  scene.add(new THREE.Points(starGeo, new THREE.PointsMaterial({ color: 0xffffff, size: 2, sizeAttenuation: true })));
 
-    const earthGroup = new THREE.Group();
-    scene.add(earthGroup);
+  // ---------- Earth ----------
+  const R = 100;
+  const EARTH_KM = 6371;
+  const SCALE = R / EARTH_KM;
 
-    const earthGeom = new THREE.SphereGeometry(R, 96, 96);
+  const earthGroup = new THREE.Group();
+  scene.add(earthGroup);
 
-    const tex = new THREE.TextureLoader();
-    let earth = null;
+  const earthGeom = new THREE.SphereGeometry(R, 96, 96);
+  const loader = new THREE.TextureLoader();
 
-    function makeFallbackEarth(){
-      const mat = new THREE.MeshStandardMaterial({ color: 0x0B1530, roughness:0.85, metalness:0.10, emissive: new THREE.Color(0x08122A), emissiveIntensity:1.25 });
-      earth = new THREE.Mesh(earthGeom, mat);
-      earthGroup.add(earth);
-      buildAtmosphere();
-    }
+  function buildAtmosphere(){
+    const atmoGeom = new THREE.SphereGeometry(R * 1.02, 96, 96);
+    const atmoMat  = new THREE.MeshBasicMaterial({ color: 0x00E6FF, transparent:true, opacity:0.05 });
+    earthGroup.add(new THREE.Mesh(atmoGeom, atmoMat));
+  }
 
- const urls = {
-  day:  "https://cdn.jsdelivr.net/gh/mrdoob/three.js@r160/examples/textures/planets/earth_atmos_2048.jpg",
-  bump: "https://cdn.jsdelivr.net/gh/mrdoob/three.js@r160/examples/textures/planets/earth_bump_2048.jpg",
-  spec: "https://cdn.jsdelivr.net/gh/mrdoob/three.js@r160/examples/textures/planets/earth_specular_2048.jpg"
-};
+  function makeFallbackEarth(){
+    const mat = new THREE.MeshStandardMaterial({
+      color: 0x0B1530, roughness:0.85, metalness:0.10,
+      emissive: new THREE.Color(0x08122A), emissiveIntensity:1.25
+    });
+    earthGroup.add(new THREE.Mesh(earthGeom, mat));
+    buildAtmosphere();
+  }
 
-    let loaded = 0, failed = false;
-    const tDay  = tex.load(urls.day,  () => { loaded++; maybeBuild(); }, undefined, () => { failed=true; maybeBuild(); });
-    const tBump = tex.load(urls.bump, () => { loaded++; maybeBuild(); }, undefined, () => { failed=true; maybeBuild(); });
-    const tSpec = tex.load(urls.spec, () => { loaded++; maybeBuild(); }, undefined, () => { failed=true; maybeBuild(); });
+  const urls = {
+    day:  "https://cdn.jsdelivr.net/gh/mrdoob/three.js@r160/examples/textures/planets/earth_atmos_2048.jpg",
+    bump: "https://cdn.jsdelivr.net/gh/mrdoob/three.js@r160/examples/textures/planets/earth_bump_2048.jpg",
+    spec: "https://cdn.jsdelivr.net/gh/mrdoob/three.js@r160/examples/textures/planets/earth_specular_2048.jpg"
+  };
 
-    function buildAtmosphere(){
-      const atmoGeom = new THREE.SphereGeometry(R * 1.02, 96, 96);
-      const atmoMat  = new THREE.MeshBasicMaterial({ color: 0x00E6FF, transparent:true, opacity:0.05 });
-      earthGroup.add(new THREE.Mesh(atmoGeom, atmoMat));
-    }
+  let earthBuilt = false;
+  const tex = {};
 
-    function maybeBuild(){
-      if (earth) return;
-      if (failed){
-        makeFallbackEarth();
-        return;
-      }
-      if (loaded < 3) return;
+  function tryBuildEarth(){
+    if (earthBuilt) return;
+    if (!tex.day || !tex.bump || !tex.spec) return;
 
-      try { tDay.colorSpace = THREE.SRGBColorSpace; } catch(e) {}
-      const mat = new THREE.MeshPhongMaterial({
-        map: tDay,
-        bumpMap: tBump,
-        bumpScale: 0.6,
-        specularMap: tSpec,
-        specular: new THREE.Color(0x222222),
-        shininess: 12
-      });
-      earth = new THREE.Mesh(earthGeom, mat);
-      earthGroup.add(earth);
-      buildAtmosphere();
-    }
+    earthBuilt = true;
 
-    // Satellites
-    let sats = [];
-    let selected = null;
-    let satMesh = null;
-    let trackLine = null;
-    let lastPosUpdateMs = 0;
+    try { tex.day.colorSpace = THREE.SRGBColorSpace; } catch(e) {}
 
-    const SAT_POINT_RADIUS = 0.6;
-    const SAT_COLOR_DEFAULT = new THREE.Color(0x00E6FF);
-    const SAT_COLOR_SELECTED = new THREE.Color(0xFFCC33);
+    const mat = new THREE.MeshPhongMaterial({
+      map: tex.day,
+      bumpMap: tex.bump,
+      bumpScale: 0.6,
+      specularMap: tex.spec,
+      specular: new THREE.Color(0x222222),
+      shininess: 12
+    });
 
-    function ecefKmToScene(v){
-      return new THREE.Vector3(v.x * SCALE, v.z * SCALE, v.y * SCALE);
-    }
+    earthGroup.add(new THREE.Mesh(earthGeom, mat));
+    buildAtmosphere();
+  }
 
-    function parseTleText(text){
-      const lines = text.split(/\r?\n/).map(l=>l.trim()).filter(Boolean);
-      const out = [];
-      for (let i=0;i<lines.length-2;i++){
-        const name = lines[i];
-        const l1 = lines[i+1];
-        const l2 = lines[i+2];
-        if (l1.startsWith("1 ") && l2.startsWith("2 ")){
-          const norad = l1.slice(2,7).trim();
-          out.push({ name, norad, l1, l2 });
-          i += 2;
-        }
-      }
-      return out;
-    }
+  // Load textures with hard fallback
+  loader.load(urls.day,  (t)=>{ tex.day=t;  tryBuildEarth(); }, undefined, ()=>makeFallbackEarth());
+  loader.load(urls.bump, (t)=>{ tex.bump=t; tryBuildEarth(); }, undefined, ()=>makeFallbackEarth());
+  loader.load(urls.spec, (t)=>{ tex.spec=t; tryBuildEarth(); }, undefined, ()=>makeFallbackEarth());
 
-    function buildSatInstancedMesh(n){
-      if (satMesh){
-        scene.remove(satMesh);
-        satMesh.geometry.dispose();
-        satMesh.material.dispose();
-      }
-      const geom = new THREE.SphereGeometry(SAT_POINT_RADIUS, 10, 10);
-      const mat  = new THREE.MeshBasicMaterial({ color: 0xffffff });
-      satMesh = new THREE.InstancedMesh(geom, mat, n);
-      satMesh.instanceMatrix.setUsage(THREE.DynamicDrawUsage);
-      satMesh.instanceColor = new THREE.InstancedBufferAttribute(new Float32Array(n*3), 3);
-      satMesh.instanceColor.setUsage(THREE.DynamicDrawUsage);
+  // ---------- Satellites ----------
+  let sats = [];
+  let selected = null;
+  let satMesh = null;
+  let trackLine = null;
+  let lastPosUpdateMs = 0;
 
-      const m = new THREE.Matrix4();
-      for (let i=0;i<n;i++){
-        m.makeTranslation(99999,99999,99999);
-        satMesh.setMatrixAt(i, m);
-        satMesh.setColorAt(i, SAT_COLOR_DEFAULT);
-        sats[i].meshIndex = i;
-      }
-      satMesh.instanceMatrix.needsUpdate = true;
-      satMesh.instanceColor.needsUpdate = true;
+  const SAT_POINT_RADIUS = 0.6;
+  const SAT_COLOR_DEFAULT = new THREE.Color(0x00E6FF);
+  const SAT_COLOR_SELECTED = new THREE.Color(0xFFCC33);
 
-      scene.add(satMesh);
-    }
+  function ecefKmToScene(v){
+    return new THREE.Vector3(v.x * SCALE, v.z * SCALE, v.y * SCALE);
+  }
 
-    async function loadEarthActive(){
-      setStatus("LOADING CATALOG…");
-      setSelectedName("—");
-      selected = null;
-      clearTrack();
-
-      const url = "https://celestrak.org/NORAD/elements/gp.php?GROUP=active&FORMAT=tle";
-      const res = await fetch(url, { cache: "no-store" });
-      if (!res.ok) throw new Error(`Catalog HTTP ${res.status}`);
-      const text = await res.text();
-      const items = parseTleText(text);
-
-      sats = items.map(it => {
-        const sr = satellite.twoline2satrec(it.l1, it.l2);
-        const inclDeg = sr.inclo * 180 / Math.PI;
-        return { name: it.name, norad: it.norad, satrec: sr, inclDeg, meshIndex: -1 };
-      });
-
-      buildSatInstancedMesh(sats.length);
-      updateSatCount(sats.length);
-      catalogNoteEl.textContent = `Catalog: Earth / active (${sats.length} objects)`;
-      setStatus("READY");
-      renderSatList();
-    }
-
-    function renderSatList(){
-      const q = (searchEl.value || "").trim().toLowerCase();
-      const matches = [];
-      for (const s of sats){
-        if (!q || s.name.toLowerCase().includes(q) || s.norad.includes(q)) matches.push(s);
-        if (matches.length >= 80) break;
-      }
-      satListEl.innerHTML = "";
-      for (const s of matches){
-        const row = document.createElement("div");
-        row.className = "satItem";
-        row.innerHTML = `<div class="satName">${escapeHtml(s.name)} <span style="color:rgba(159,179,217,.8);font-weight:700">(${s.norad})</span></div><div class="pill">TRACK</div>`;
-        row.addEventListener("click", () => selectSatByNorad(s.norad));
-        satListEl.appendChild(row);
+  function parseTleText(text){
+    const lines = text.split(/\r?\n/).map(l=>l.trim()).filter(Boolean);
+    const out = [];
+    for (let i=0;i<lines.length-2;i++){
+      const name = lines[i];
+      const l1 = lines[i+1];
+      const l2 = lines[i+2];
+      if (l1.startsWith("1 ") && l2.startsWith("2 ")){
+        const norad = l1.slice(2,7).trim();
+        out.push({ name, norad, l1, l2 });
+        i += 2;
       }
     }
+    return out;
+  }
 
-    function escapeHtml(s){
-      return s.replace(/[&<>"']/g, (c) => ({'&':'&amp;','<':'&lt;','>':'&gt;','"':'&quot;',"'":'&#39;'}[c]));
+  function escapeHtml(s){
+    return s.replace(/[&<>"']/g, (c) => ({'&':'&amp;','<':'&lt;','>':'&gt;','"':'&quot;',"'":'&#39;'}[c]));
+  }
+
+  function clearTrack(){
+    if (trackLine){
+      scene.remove(trackLine);
+      trackLine.geometry.dispose();
+      trackLine.material.dispose();
+      trackLine = null;
     }
+  }
 
-    function clearTrack(){
-      if (trackLine){
-        scene.remove(trackLine);
-        trackLine.geometry.dispose();
-        trackLine.material.dispose();
-        trackLine = null;
+  function buildSatInstancedMesh(n){
+    if (satMesh){
+      scene.remove(satMesh);
+      satMesh.geometry.dispose();
+      satMesh.material.dispose();
+    }
+    const geom = new THREE.SphereGeometry(SAT_POINT_RADIUS, 10, 10);
+    const mat  = new THREE.MeshBasicMaterial({ color: 0xffffff });
+    satMesh = new THREE.InstancedMesh(geom, mat, n);
+    satMesh.instanceMatrix.setUsage(THREE.DynamicDrawUsage);
+    satMesh.instanceColor = new THREE.InstancedBufferAttribute(new Float32Array(n*3), 3);
+    satMesh.instanceColor.setUsage(THREE.DynamicDrawUsage);
+
+    const m = new THREE.Matrix4();
+    for (let i=0;i<n;i++){
+      m.makeTranslation(99999,99999,99999);
+      satMesh.setMatrixAt(i, m);
+      satMesh.setColorAt(i, SAT_COLOR_DEFAULT);
+      sats[i].meshIndex = i;
+    }
+    satMesh.instanceMatrix.needsUpdate = true;
+    satMesh.instanceColor.needsUpdate = true;
+
+    scene.add(satMesh);
+  }
+
+  async function loadEarthActive(){
+    setStatus("LOADING CATALOG…");
+    setSelectedName("—");
+    selected = null;
+    clearTrack();
+
+    const url = "https://celestrak.org/NORAD/elements/gp.php?GROUP=active&FORMAT=tle";
+    const res = await fetch(url, { cache: "no-store" });
+    if (!res.ok) throw new Error(`Catalog HTTP ${res.status}`);
+
+    const text = await res.text();
+    const items = parseTleText(text);
+
+    sats = items.map(it => {
+      const sr = satellite.twoline2satrec(it.l1, it.l2);
+      const inclDeg = sr.inclo * 180 / Math.PI;
+      return { name: it.name, norad: it.norad, satrec: sr, inclDeg, meshIndex: -1 };
+    });
+
+    buildSatInstancedMesh(sats.length);
+    updateSatCount(sats.length);
+    catalogNoteEl.textContent = `Catalog: Earth / active (${sats.length} objects)`;
+    setStatus("READY");
+    renderSatList();
+  }
+
+  function renderSatList(){
+    const q = (searchEl.value || "").trim().toLowerCase();
+    const matches = [];
+    for (const s of sats){
+      if (!q || s.name.toLowerCase().includes(q) || s.norad.includes(q)) matches.push(s);
+      if (matches.length >= 80) break;
+    }
+    satListEl.innerHTML = "";
+    for (const s of matches){
+      const row = document.createElement("div");
+      row.className = "satItem";
+      row.innerHTML = `<div class="satName">${escapeHtml(s.name)} <span style="color:rgba(159,179,217,.8);font-weight:700">(${s.norad})</span></div><div class="pill">TRACK</div>`;
+      row.addEventListener("click", () => selectSatByNorad(s.norad));
+      satListEl.appendChild(row);
+    }
+  }
+
+  function setAllColorsDefault(){
+    if (!satMesh) return;
+    for (let i=0;i<sats.length;i++) satMesh.setColorAt(i, SAT_COLOR_DEFAULT);
+    satMesh.instanceColor.needsUpdate = true;
+  }
+
+  function selectSatByNorad(norad){
+    const s = sats.find(x => x.norad === norad) || null;
+    selected = s;
+    setSelectedName(s ? s.name : "—");
+
+    if (satMesh){
+      setAllColorsDefault();
+      if (s){
+        satMesh.setColorAt(s.meshIndex, SAT_COLOR_SELECTED);
+        satMesh.instanceColor.needsUpdate = true;
       }
     }
 
-    function setAllColorsDefault(){
-      if (!satMesh) return;
-      for (let i=0;i<sats.length;i++) satMesh.setColorAt(i, SAT_COLOR_DEFAULT);
-      satMesh.instanceColor.needsUpdate = true;
-    }
+    clearTrack();
+    if (s) buildSelectedTrack(s, 90, 2);
+  }
 
-    function selectSatByNorad(norad){
-      const s = sats.find(x => x.norad === norad) || null;
-      selected = s;
-      setSelectedName(s ? s.name : "—");
-
-      if (satMesh){
-        setAllColorsDefault();
-        if (s){
-          satMesh.setColorAt(s.meshIndex, SAT_COLOR_SELECTED);
-          satMesh.instanceColor.needsUpdate = true;
-        }
-      }
-
-      clearTrack();
-      if (s) buildSelectedTrack(s, 90, 2);
-    }
-
-    function buildSelectedTrack(sat, minutesAhead=90, stepMin=2){
-      const pts = [];
-      const now = new Date();
-      for (let m=0; m<=minutesAhead; m+=stepMin){
-        const t = new Date(now.getTime() + m*60*1000);
-        const pv = satellite.propagate(sat.satrec, t);
-        if (!pv.position) continue;
-        const gmst = satellite.gstime(t);
-        const ecef = satellite.eciToEcf(pv.position, gmst);
-        pts.push(ecefKmToScene(ecef));
-      }
-      const geo = new THREE.BufferGeometry().setFromPoints(pts);
-      const mat = new THREE.LineBasicMaterial({ color: 0xFFCC33, transparent:true, opacity:0.85 });
-      trackLine = new THREE.Line(geo, mat);
-      trackLine.userData.last = performance.now();
-      scene.add(trackLine);
-    }
-
-    function updateSatPositions(now){
-      if (!satMesh || !sats.length) return;
-      const t = now || new Date();
+  function buildSelectedTrack(sat, minutesAhead=90, stepMin=2){
+    const pts = [];
+    const now = new Date();
+    for (let m=0; m<=minutesAhead; m+=stepMin){
+      const t = new Date(now.getTime() + m*60*1000);
+      const pv = satellite.propagate(sat.satrec, t);
+      if (!pv.position) continue;
       const gmst = satellite.gstime(t);
+      const ecef = satellite.eciToEcf(pv.position, gmst);
+      pts.push(ecefKmToScene(ecef));
+    }
+    const geo = new THREE.BufferGeometry().setFromPoints(pts);
+    const mat = new THREE.LineBasicMaterial({ color: 0xFFCC33, transparent:true, opacity:0.85 });
+    trackLine = new THREE.Line(geo, mat);
+    trackLine.userData.last = performance.now();
+    scene.add(trackLine);
+  }
 
-      const mat4 = new THREE.Matrix4();
-      for (let i=0;i<sats.length;i++){
-        const s = sats[i];
-        const pv = satellite.propagate(s.satrec, t);
-        if (!pv.position){
-          mat4.makeTranslation(99999,99999,99999);
-          satMesh.setMatrixAt(i, mat4);
-          continue;
-        }
-        const ecef = satellite.eciToEcf(pv.position, gmst);
-        const p = ecefKmToScene(ecef);
-        mat4.makeTranslation(p.x, p.y, p.z);
+  function updateSatPositions(now){
+    if (!satMesh || !sats.length) return;
+    const t = now || new Date();
+    const gmst = satellite.gstime(t);
+
+    const mat4 = new THREE.Matrix4();
+    for (let i=0;i<sats.length;i++){
+      const s = sats[i];
+      const pv = satellite.propagate(s.satrec, t);
+      if (!pv.position){
+        mat4.makeTranslation(99999,99999,99999);
         satMesh.setMatrixAt(i, mat4);
+        continue;
       }
-      satMesh.instanceMatrix.needsUpdate = true;
+      const ecef = satellite.eciToEcf(pv.position, gmst);
+      const p = ecefKmToScene(ecef);
+      mat4.makeTranslation(p.x, p.y, p.z);
+      satMesh.setMatrixAt(i, mat4);
+    }
+    satMesh.instanceMatrix.needsUpdate = true;
 
-      if (selected){
-        const pv = satellite.propagate(selected.satrec, t);
-        if (pv.position && pv.velocity){
-          const geo = satellite.eciToGeodetic(pv.position, gmst);
-          const lat = satellite.degreesLat(geo.latitude);
-          const lon = satellite.degreesLong(geo.longitude);
-          const alt = geo.height;
-          const v = pv.velocity;
-          const spd = Math.sqrt(v.x*v.x + v.y*v.y + v.z*v.z);
-          infoLat.textContent = lat.toFixed(2);
-          infoLon.textContent = lon.toFixed(2);
-          infoAlt.textContent = alt.toFixed(1);
-          infoSpd.textContent = spd.toFixed(3);
-          infoUtc.textContent = t.toISOString().replace("T"," ").slice(0,19) + "Z";
-        }
-      } else {
-        infoLat.textContent = infoLon.textContent = infoAlt.textContent = infoSpd.textContent = infoUtc.textContent = "—";
+    if (selected){
+      const pv = satellite.propagate(selected.satrec, t);
+      if (pv.position && pv.velocity){
+        const geo = satellite.eciToGeodetic(pv.position, gmst);
+        infoLat.textContent = satellite.degreesLat(geo.latitude).toFixed(2);
+        infoLon.textContent = satellite.degreesLong(geo.longitude).toFixed(2);
+        infoAlt.textContent = geo.height.toFixed(1);
+        const v = pv.velocity;
+        const spd = Math.sqrt(v.x*v.x + v.y*v.y + v.z*v.z);
+        infoSpd.textContent = spd.toFixed(3);
+        infoUtc.textContent = t.toISOString().replace("T"," ").slice(0,19) + "Z";
       }
+    } else {
+      infoLat.textContent = infoLon.textContent = infoAlt.textContent = infoSpd.textContent = infoUtc.textContent = "—";
     }
+  }
 
-    // Orbital planner (overview)
-    const launchOut = el("launchOut");
-    const launchLatLon = el("launchLatLon");
-    const targetIncEl = el("targetInc");
-    const targetAltEl = el("targetAlt");
-    const presetEl = el("launchPreset");
-
-    presetEl.addEventListener("change", () => { launchLatLon.value = presetEl.value; });
-
-    function parseLatLon(str){
-      const parts = (str || "").split(",").map(s => s.trim());
-      if (parts.length < 2) return null;
-      const lat = Number(parts[0]), lon = Number(parts[1]);
-      if (!isFinite(lat) || !isFinite(lon)) return null;
-      return { lat, lon };
+  // ---------- Body selector ----------
+  function clearAll(){
+    setStatus("READY");
+    sats = [];
+    selected = null;
+    updateSatCount(0);
+    setSelectedName("—");
+    catalogNoteEl.textContent = "Catalog: —";
+    satListEl.innerHTML = "";
+    clearTrack();
+    if (satMesh){
+      scene.remove(satMesh);
+      satMesh.geometry.dispose();
+      satMesh.material.dispose();
+      satMesh = null;
     }
+  }
 
-    function estimateAltKmFromSatrec(sr){
-      const mu = 398600.4418;
-      const n = sr.no * (1/60.0);
-      if (!isFinite(n) || n <= 0) return NaN;
-      const a = Math.pow(mu/(n*n), 1/3);
-      return a - EARTH_KM;
+  function onBodyChange(){
+    const body = bodySelectEl.value;
+    if (body === "earth"){
+      catalogNoteEl.textContent = "Catalog: Earth / active (ready)";
+      return;
     }
+    clearAll();
+    setStatus("BODY NOT WIRED");
+    catalogNoteEl.textContent = `Catalog: ${body} (not wired)`;
+    el("launchOut").value =
+      `Selected body: ${body}\n\nEarth works today because public TLE catalogs exist.\nFor other bodies you need an orbital-elements feed.\n`;
+  }
 
-    function congestionIndex(targetInc, targetAlt){
-      if (!sats.length) return 0;
-      const incLo = targetInc - 3, incHi = targetInc + 3;
-      const altLo = targetAlt - 80, altHi = targetAlt + 80;
-      let c = 0;
-      for (const s of sats){
-        if (s.inclDeg < incLo || s.inclDeg > incHi) continue;
-        const alt = estimateAltKmFromSatrec(s.satrec);
-        if (!isFinite(alt)) continue;
-        if (alt >= altLo && alt <= altHi) c++;
-      }
-      return c;
-    }
+  // ---------- Wire UI ----------
+  el("loadAllBtn").addEventListener("click", async () => {
+    try{ await loadEarthActive(); }
+    catch(e){ setStatus("ERROR"); alert(String(e.message || e)); }
+  });
+  el("clearBtn").addEventListener("click", clearAll);
+  searchEl.addEventListener("input", renderSatList);
+  bodySelectEl.addEventListener("change", onBodyChange);
 
-    async function fetchWeather(lat, lon){
-      const url = new URL("https://api.open-meteo.com/v1/forecast");
-      url.searchParams.set("latitude", String(lat));
-      url.searchParams.set("longitude", String(lon));
-      url.searchParams.set("hourly", "precipitation,windspeed_10m,windgusts_10m");
-      url.searchParams.set("forecast_days", "2");
-      url.searchParams.set("timezone", "UTC");
-      const res = await fetch(url.toString(), { cache:"no-store" });
-      if (!res.ok) throw new Error(`Weather HTTP ${res.status}`);
-      return await res.json();
-    }
+  onBodyChange();
 
-    function scoreHour(wind, gust, precip, cong){
-      let score = 100;
-      score -= Math.max(0, wind) * 2.2;
-      score -= Math.max(0, gust) * 1.4;
-      score -= Math.max(0, precip) * 12.0;
-      score -= Math.min(40, Math.log10(1 + Math.max(0, cong)) * 18);
-      return Math.max(0, Math.min(100, score));
-    }
+  // ---------- Animate loop ----------
+  function animate(){
+    const nowMs = performance.now();
+    if (nowMs - lastPosUpdateMs > 1000){
+      updateSatPositions(new Date());
+      lastPosUpdateMs = nowMs;
 
-    async function computeLaunchOverview(){
-      const ll = parseLatLon(launchLatLon.value);
-      if (!ll){ launchOut.value = "Invalid launch site. Use: lat,lon"; return; }
-      const targetInc = Number(targetIncEl.value);
-      const targetAlt = Number(targetAltEl.value);
-      if (!isFinite(targetInc) || !isFinite(targetAlt)){ launchOut.value = "Invalid target inc/alt."; return; }
-
-      setStatus("PLANNING…");
-      launchOut.value = "Fetching weather…";
-
-      let wx;
-      try{ wx = await fetchWeather(ll.lat, ll.lon); }
-      catch(e){ launchOut.value = `Weather fetch failed: ${e.message}`; setStatus("READY"); return; }
-
-      const cong = congestionIndex(targetInc, targetAlt);
-      const times = wx?.hourly?.time || [];
-      const wind  = wx?.hourly?.windspeed_10m || [];
-      const gust  = wx?.hourly?.windgusts_10m || [];
-      const precip= wx?.hourly?.precipitation || [];
-
-      const rows = [];
-      for (let i=0;i<times.length;i++){
-        rows.push({ t: times[i], score: scoreHour(wind[i], gust[i], precip[i], cong), wind: wind[i], gust: gust[i], precip: precip[i] });
-      }
-      rows.sort((a,b)=>b.score-a.score);
-
-      const top = rows.slice(0, 8);
-      let out = "";
-      out += `Launch site: ${ll.lat.toFixed(4)}, ${ll.lon.toFixed(4)} (UTC)\n`;
-      out += `Target: inc ${targetInc.toFixed(1)}°, alt ${targetAlt.toFixed(0)} km\n`;
-      out += `Orbital congestion index (near target): ${cong} active sats\n\n`;
-      out += `Top weather-aware windows (next ~48h):\n`;
-      for (const r of top){
-        out += `• ${r.t}  score ${r.score.toFixed(0)}  wind ${Number(r.wind).toFixed(1)}  gust ${Number(r.gust).toFixed(1)}  precip ${Number(r.precip).toFixed(2)}\n`;
-      }
-      launchOut.value = out;
-      setStatus("READY");
-    }
-
-    // Body selector framework
-    function clearAll(){
-      setStatus("READY");
-      sats = [];
-      selected = null;
-      updateSatCount(0);
-      setSelectedName("—");
-      catalogNoteEl.textContent = "Catalog: —";
-      satListEl.innerHTML = "";
-      clearTrack();
-      if (satMesh){
-        scene.remove(satMesh);
-        satMesh.geometry.dispose();
-        satMesh.material.dispose();
-        satMesh = null;
+      if (selected && trackLine && (nowMs - (trackLine.userData.last || 0) > 10000)){
+        clearTrack();
+        buildSelectedTrack(selected, 90, 2);
       }
     }
 
-    function onBodyChange(){
-      const body = bodySelectEl.value;
-      if (body === "earth"){
-        catalogNoteEl.textContent = "Catalog: Earth / active (ready)";
-        return;
-      }
-      clearAll();
-      setStatus("BODY NOT WIRED");
-      catalogNoteEl.textContent = `Catalog: ${body} (not wired)`;
-      launchOut.value = `Selected body: ${body}\n\nThis UI supports multi-body catalogs, but you must provide a public orbital-elements feed for that body.\nEarth works today because public TLE catalogs exist.\n`;
-    }
-
-    // Wire UI
-    el("loadAllBtn").addEventListener("click", async () => {
-      try{ await loadEarthActive(); }
-      catch(e){ setStatus("ERROR"); alert(String(e.message || e)); }
-    });
-    el("clearBtn").addEventListener("click", clearAll);
-    el("launchBtn").addEventListener("click", computeLaunchOverview);
-    searchEl.addEventListener("input", renderSatList);
-    bodySelectEl.addEventListener("change", onBodyChange);
-
-    onBodyChange();
-
-    // Animate loop
-    function animate(){
-      const nowMs = performance.now();
-      if (nowMs - lastPosUpdateMs > 1000){
-        updateSatPositions(new Date());
-        lastPosUpdateMs = nowMs;
-
-        if (selected && trackLine && (nowMs - (trackLine.userData.last || 0) > 10000)){
-          clearTrack();
-          buildSelectedTrack(selected, 90, 2);
-        }
-      }
-
-      controls.update();
-      renderer.render(scene, camera);
-      requestAnimationFrame(animate);
-    }
+    controls.update();
+    renderer.render(scene, camera);
     requestAnimationFrame(animate);
+  }
+  requestAnimationFrame(animate);
 
-    window.addEventListener("resize", () => {
-      camera.aspect = window.innerWidth / window.innerHeight;
-      camera.updateProjectionMatrix();
-      renderer.setSize(window.innerWidth, window.innerHeight);
-    });
+  window.addEventListener("resize", () => {
+    camera.aspect = window.innerWidth / window.innerHeight;
+    camera.updateProjectionMatrix();
+    renderer.setSize(window.innerWidth, window.innerHeight);
+  });
   </script>
 </body>
 </html>
+
 
 
 
