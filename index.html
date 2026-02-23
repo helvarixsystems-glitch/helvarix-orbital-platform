@@ -338,10 +338,8 @@
     </div>
   </div>
 
-  <!-- satellite.js as GLOBAL -->
-  <script data-cfasync="false" src="https://cdn.jsdelivr.net/npm/satellite.js@5.0.1/dist/satellite.min.js"></script>
-
- <script type="importmap">
+ <!-- Import map for THREE -->
+<script type="importmap">
 {
   "imports": {
     "three": "https://unpkg.com/three@0.160.0/build/three.module.js",
@@ -353,8 +351,10 @@
 <script type="module">
   import * as THREE from "three";
   import { OrbitControls } from "three/addons/controls/OrbitControls.js";
+  import * as satellite from "https://cdn.jsdelivr.net/npm/satellite.js@5.0.1/dist/satellite.es.js";
 
-  const satellite = window.satellite;
+  // UI helpers
+  const el = (id) => document.getElementById(id);
   if (!satellite) {
     const se = document.getElementById("status");
     if (se) se.textContent = "SATELLITE.JS NOT LOADED";
@@ -842,6 +842,7 @@
   </script>
 </body>
 </html>
+
 
 
 
