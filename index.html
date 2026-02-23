@@ -18,7 +18,6 @@
       --text:#EAF1FF;
       --muted:#9FB3D9;
 
-      /* Brand */
       --nebulaViolet:#7A5CFF;
       --stellarCyan:#00E6FF;
       --solarGold:#FFCC33;
@@ -216,7 +215,6 @@
     #hud .v{ color:rgba(234,241,255,.95); font-weight:800; letter-spacing:.2px; }
     #hud .dot{ width:6px; height:6px; border-radius:50%; background:var(--stellarCyan); box-shadow:0 0 10px rgba(0,230,255,.6); }
 
-    /* Planet picker bottom-right */
     .panel.planet{
       top:auto;
       bottom:18px;
@@ -338,17 +336,8 @@
     </div>
   </div>
 
-<!-- Importmap for THREE -->
-<script type="importmap">
-{
-  "imports": {
-    "three": "https://unpkg.com/three@0.160.0/build/three.module.js",
-    "three/addons/": "https://unpkg.com/three@0.160.0/examples/jsm/"
-  }
-}
-</script>
-
 <script type="module">
+  // ✅ No importmap. No bare imports. No window.satellite. No Rocket Loader dependency.
   import * as THREE from "https://unpkg.com/three@0.160.0/build/three.module.js";
   import { OrbitControls } from "https://unpkg.com/three@0.160.0/examples/jsm/controls/OrbitControls.js";
   import * as satellite from "https://esm.sh/satellite.js@5.0.1?bundle";
@@ -371,9 +360,17 @@
   const infoSpd  = el("infoSpd");
   const infoUtc  = el("infoUtc");
 
+  const launchOut = el("launchOut");
+  const launchLatLon = el("launchLatLon");
+  const targetIncEl = el("targetInc");
+  const targetAltEl = el("targetAlt");
+  const presetEl = el("launchPreset");
+
   function setStatus(s){ statusEl.textContent = s; }
   function setSelectedName(s){ selectedNameEl.textContent = s; infoName.textContent = s; }
   function updateSatCount(n){ satCountEl.textContent = String(n); }
+
+  presetEl.addEventListener("change", () => { launchLatLon.value = presetEl.value; });
 
   // ---------- Three.js setup ----------
   const canvas = el("c");
@@ -429,7 +426,11 @@
     earthGroup.add(new THREE.Mesh(atmoGeom, atmoMat));
   }
 
-  function makeFallbackEarth(){
+  let earthBuilt = false;
+
+  function makeFallbackEarthOnce(){
+    if (earthBuilt) return;
+    earthBuilt = true;
     const mat = new THREE.MeshStandardMaterial({
       color: 0x0B1530, roughness:0.85, metalness:0.10,
       emissive: new THREE.Color(0x08122A), emissiveIntensity:1.25
@@ -444,15 +445,13 @@
     spec: "https://cdn.jsdelivr.net/gh/mrdoob/three.js@r160/examples/textures/planets/earth_specular_2048.jpg"
   };
 
-  let earthBuilt = false;
-  const tex = {};
+  const tex = { day:null, bump:null, spec:null };
 
   function tryBuildEarth(){
     if (earthBuilt) return;
     if (!tex.day || !tex.bump || !tex.spec) return;
 
     earthBuilt = true;
-
     try { tex.day.colorSpace = THREE.SRGBColorSpace; } catch(e) {}
 
     const mat = new THREE.MeshPhongMaterial({
@@ -468,10 +467,13 @@
     buildAtmosphere();
   }
 
-  // Load textures with hard fallback
-  loader.load(urls.day,  (t)=>{ tex.day=t;  tryBuildEarth(); }, undefined, ()=>makeFallbackEarth());
-  loader.load(urls.bump, (t)=>{ tex.bump=t; tryBuildEarth(); }, undefined, ()=>makeFallbackEarth());
-  loader.load(urls.spec, (t)=>{ tex.spec=t; tryBuildEarth(); }, undefined, ()=>makeFallbackEarth());
+  // Load textures; if any fails, fallback once.
+  loader.load(urls.day,  (t)=>{ tex.day=t;  tryBuildEarth(); }, undefined, ()=>makeFallbackEarthOnce());
+  loader.load(urls.bump, (t)=>{ tex.bump=t; tryBuildEarth(); }, undefined, ()=>makeFallbackEarthOnce());
+  loader.load(urls.spec, (t)=>{ tex.spec=t; tryBuildEarth(); }, undefined, ()=>makeFallbackEarthOnce());
+
+  // Safety: if textures hang, fallback after 6s
+  setTimeout(() => { if (!earthBuilt) makeFallbackEarthOnce(); }, 6000);
 
   // ---------- Satellites ----------
   let sats = [];
@@ -543,30 +545,10 @@
     scene.add(satMesh);
   }
 
-  async function loadEarthActive(){
-    setStatus("LOADING CATALOG…");
-    setSelectedName("—");
-    selected = null;
-    clearTrack();
-
-    const url = "https://celestrak.org/NORAD/elements/gp.php?GROUP=active&FORMAT=tle";
-    const res = await fetch(url, { cache: "no-store" });
-    if (!res.ok) throw new Error(`Catalog HTTP ${res.status}`);
-
-    const text = await res.text();
-    const items = parseTleText(text);
-
-    sats = items.map(it => {
-      const sr = satellite.twoline2satrec(it.l1, it.l2);
-      const inclDeg = sr.inclo * 180 / Math.PI;
-      return { name: it.name, norad: it.norad, satrec: sr, inclDeg, meshIndex: -1 };
-    });
-
-    buildSatInstancedMesh(sats.length);
-    updateSatCount(sats.length);
-    catalogNoteEl.textContent = `Catalog: Earth / active (${sats.length} objects)`;
-    setStatus("READY");
-    renderSatList();
+  function setAllColorsDefault(){
+    if (!satMesh) return;
+    for (let i=0;i<sats.length;i++) satMesh.setColorAt(i, SAT_COLOR_DEFAULT);
+    satMesh.instanceColor.needsUpdate = true;
   }
 
   function renderSatList(){
@@ -584,12 +566,6 @@
       row.addEventListener("click", () => selectSatByNorad(s.norad));
       satListEl.appendChild(row);
     }
-  }
-
-  function setAllColorsDefault(){
-    if (!satMesh) return;
-    for (let i=0;i<sats.length;i++) satMesh.setColorAt(i, SAT_COLOR_DEFAULT);
-    satMesh.instanceColor.needsUpdate = true;
   }
 
   function selectSatByNorad(norad){
@@ -655,6 +631,7 @@
         infoLat.textContent = satellite.degreesLat(geo.latitude).toFixed(2);
         infoLon.textContent = satellite.degreesLong(geo.longitude).toFixed(2);
         infoAlt.textContent = geo.height.toFixed(1);
+
         const v = pv.velocity;
         const spd = Math.sqrt(v.x*v.x + v.y*v.y + v.z*v.z);
         infoSpd.textContent = spd.toFixed(3);
@@ -663,6 +640,60 @@
     } else {
       infoLat.textContent = infoLon.textContent = infoAlt.textContent = infoSpd.textContent = infoUtc.textContent = "—";
     }
+  }
+
+  async function loadEarthActive(){
+    setStatus("LOADING CATALOG…");
+    setSelectedName("—");
+    selected = null;
+    clearTrack();
+
+    // CORS-friendly endpoint
+    const url = "https://celestrak.org/NORAD/elements/gp.php?GROUP=active&FORMAT=tle";
+    const res = await fetch(url, { cache: "no-store" });
+    if (!res.ok) throw new Error(`Catalog HTTP ${res.status}`);
+
+    const text = await res.text();
+    const items = parseTleText(text);
+
+    sats = items.map(it => {
+      const sr = satellite.twoline2satrec(it.l1, it.l2);
+      const inclDeg = sr.inclo * 180 / Math.PI;
+      return { name: it.name, norad: it.norad, satrec: sr, inclDeg, meshIndex: -1 };
+    });
+
+    buildSatInstancedMesh(sats.length);
+    updateSatCount(sats.length);
+    catalogNoteEl.textContent = `Catalog: Earth / active (${sats.length} objects)`;
+    setStatus("READY");
+    renderSatList();
+  }
+
+  // ---------- Planner (minimal placeholder, won’t error) ----------
+  function parseLatLon(str){
+    const parts = (str || "").split(",").map(s => s.trim());
+    if (parts.length < 2) return null;
+    const lat = Number(parts[0]), lon = Number(parts[1]);
+    if (!isFinite(lat) || !isFinite(lon)) return null;
+    return { lat, lon };
+  }
+
+  function computeLaunchOverview(){
+    const ll = parseLatLon(launchLatLon.value);
+    if (!ll){
+      launchOut.value = "Invalid launch site. Use: lat,lon";
+      return;
+    }
+    const targetInc = Number(targetIncEl.value);
+    const targetAlt = Number(targetAltEl.value);
+    if (!isFinite(targetInc) || !isFinite(targetAlt)){
+      launchOut.value = "Invalid target inclination/altitude.";
+      return;
+    }
+    launchOut.value =
+      `Launch site: ${ll.lat.toFixed(4)}, ${ll.lon.toFixed(4)}\n` +
+      `Target: inc ${targetInc.toFixed(1)}°, alt ${targetAlt.toFixed(0)} km\n\n` +
+      `Tip: Load satellites first to compute congestion-based metrics.\n`;
   }
 
   // ---------- Body selector ----------
@@ -692,16 +723,19 @@
     clearAll();
     setStatus("BODY NOT WIRED");
     catalogNoteEl.textContent = `Catalog: ${body} (not wired)`;
-    el("launchOut").value =
-      `Selected body: ${body}\n\nEarth works today because public TLE catalogs exist.\nFor other bodies you need an orbital-elements feed.\n`;
+    launchOut.value =
+      `Selected body: ${body}\n\n` +
+      `Earth works today because public TLE catalogs exist.\n` +
+      `For other bodies you need an orbital-elements feed.\n`;
   }
 
   // ---------- Wire UI ----------
   el("loadAllBtn").addEventListener("click", async () => {
     try{ await loadEarthActive(); }
-    catch(e){ setStatus("ERROR"); alert(String(e.message || e)); }
+    catch(e){ setStatus("ERROR"); alert(String(e?.message || e)); }
   });
   el("clearBtn").addEventListener("click", clearAll);
+  el("launchBtn").addEventListener("click", computeLaunchOverview);
   searchEl.addEventListener("input", renderSatList);
   bodySelectEl.addEventListener("change", onBodyChange);
 
@@ -731,16 +765,6 @@
     camera.updateProjectionMatrix();
     renderer.setSize(window.innerWidth, window.innerHeight);
   });
-  </script>
+</script>
 </body>
 </html>
-
-
-
-
-
-
-
-
-
-
