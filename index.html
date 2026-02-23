@@ -307,15 +307,27 @@
     </div>
   </div>
 
-  <!-- satellite.js as a GLOBAL (avoids CORS/module issues) -->
-  <script src="https://cdn.jsdelivr.net/npm/satellite.js@5.0.1/dist/satellite.min.js"></script>
+ <!-- satellite.js global -->
+<script src="https://cdn.jsdelivr.net/npm/satellite.js@5.0.1/dist/satellite.min.js"></script>
 
-  <!-- Everything else as ES modules (fixes OrbitControls + deprecation issues) -->
-  <script type="module">
-    import * as THREE from "https://unpkg.com/three@0.160.0/build/three.module.js";
-    import { OrbitControls } from "https://unpkg.com/three@0.160.0/examples/jsm/controls/OrbitControls.js";
-    const satellite = window.satellite;
-  </script>
+<!-- import map (MUST be before the module script) -->
+<script type="importmap">
+{
+  "imports": {
+    "three": "https://unpkg.com/three@0.160.0/build/three.module.js"
+  }
+}
+</script>
+
+<!-- main module -->
+<script type="module">
+  import * as THREE from "three";
+  import { OrbitControls } from "https://unpkg.com/three@0.160.0/examples/jsm/controls/OrbitControls.js";
+
+  const satellite = window.satellite;
+
+  // ...KEEP THE REST OF YOUR EXISTING JS HERE...
+</script>
     // -----------------------------
     // Scene / Camera / Renderer
     // -----------------------------
@@ -800,3 +812,4 @@
 </body>
 
 </html>
+
