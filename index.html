@@ -48,6 +48,7 @@
       -webkit-backdrop-filter: blur(10px);
       color:var(--text);
       overflow:hidden;
+      z-index:10;
     }
     .panel.left{ left:18px; }
     .panel.right{ right:18px; width:340px; }
@@ -79,7 +80,6 @@
       letter-spacing:.6px;
       color:rgba(159,179,217,.95);
       margin:10px 0 6px;
-      text-transform:none;
     }
     input, textarea, select{
       width:100%;
@@ -209,7 +209,7 @@
       align-items:center;
       backdrop-filter: blur(10px);
       -webkit-backdrop-filter: blur(10px);
-      z-index:5;
+      z-index:20;
     }
     #hud .k{ color:rgba(159,179,217,.95); font-weight:700; }
     #hud .v{ color:rgba(234,241,255,.95); font-weight:800; letter-spacing:.2px; }
@@ -220,7 +220,7 @@
       bottom:18px;
       right:18px;
       width:340px;
-      z-index:6;
+      z-index:15;
     }
 
     @media (max-width: 980px){
@@ -337,12 +337,10 @@
   </div>
 
 <script type="module">
-  // ✅ No importmap. No bare imports. No window.satellite. No Rocket Loader dependency.
   import * as THREE from "https://unpkg.com/three@0.160.0/build/three.module.js";
   import { OrbitControls } from "https://unpkg.com/three@0.160.0/examples/jsm/controls/OrbitControls.js";
-  import * as satellite from "https://esm.sh/satellite.js@5.0.1?bundle";
 
-  // ---------- UI helpers ----------
+  // --- UI helpers
   const el = (id) => document.getElementById(id);
 
   const statusEl = el("status");
@@ -372,7 +370,7 @@
 
   presetEl.addEventListener("change", () => { launchLatLon.value = presetEl.value; });
 
-  // ---------- Three.js setup ----------
+  // --- Three.js scene (this MUST run even if satellite fails)
   const canvas = el("c");
   const renderer = new THREE.WebGLRenderer({ canvas, antialias:true, alpha:true });
   renderer.setPixelRatio(Math.min(2, window.devicePixelRatio || 1));
@@ -409,7 +407,7 @@
   starGeo.setAttribute("position", new THREE.BufferAttribute(starPos, 3));
   scene.add(new THREE.Points(starGeo, new THREE.PointsMaterial({ color: 0xffffff, size: 2, sizeAttenuation: true })));
 
-  // ---------- Earth ----------
+  // Earth
   const R = 100;
   const EARTH_KM = 6371;
   const SCALE = R / EARTH_KM;
@@ -418,7 +416,6 @@
   scene.add(earthGroup);
 
   const earthGeom = new THREE.SphereGeometry(R, 96, 96);
-  const loader = new THREE.TextureLoader();
 
   function buildAtmosphere(){
     const atmoGeom = new THREE.SphereGeometry(R * 1.02, 96, 96);
@@ -427,8 +424,7 @@
   }
 
   let earthBuilt = false;
-
-  function makeFallbackEarthOnce(){
+  function buildFallbackEarth(){
     if (earthBuilt) return;
     earthBuilt = true;
     const mat = new THREE.MeshStandardMaterial({
@@ -439,21 +435,19 @@
     buildAtmosphere();
   }
 
+  const loader = new THREE.TextureLoader();
   const urls = {
     day:  "https://cdn.jsdelivr.net/gh/mrdoob/three.js@r160/examples/textures/planets/earth_atmos_2048.jpg",
     bump: "https://cdn.jsdelivr.net/gh/mrdoob/three.js@r160/examples/textures/planets/earth_bump_2048.jpg",
     spec: "https://cdn.jsdelivr.net/gh/mrdoob/three.js@r160/examples/textures/planets/earth_specular_2048.jpg"
   };
-
   const tex = { day:null, bump:null, spec:null };
 
   function tryBuildEarth(){
     if (earthBuilt) return;
     if (!tex.day || !tex.bump || !tex.spec) return;
-
     earthBuilt = true;
     try { tex.day.colorSpace = THREE.SRGBColorSpace; } catch(e) {}
-
     const mat = new THREE.MeshPhongMaterial({
       map: tex.day,
       bumpMap: tex.bump,
@@ -462,20 +456,32 @@
       specular: new THREE.Color(0x222222),
       shininess: 12
     });
-
     earthGroup.add(new THREE.Mesh(earthGeom, mat));
     buildAtmosphere();
   }
 
-  // Load textures; if any fails, fallback once.
-  loader.load(urls.day,  (t)=>{ tex.day=t;  tryBuildEarth(); }, undefined, ()=>makeFallbackEarthOnce());
-  loader.load(urls.bump, (t)=>{ tex.bump=t; tryBuildEarth(); }, undefined, ()=>makeFallbackEarthOnce());
-  loader.load(urls.spec, (t)=>{ tex.spec=t; tryBuildEarth(); }, undefined, ()=>makeFallbackEarthOnce());
+  loader.load(urls.day,  (t)=>{ tex.day=t;  tryBuildEarth(); }, undefined, ()=>buildFallbackEarth());
+  loader.load(urls.bump, (t)=>{ tex.bump=t; tryBuildEarth(); }, undefined, ()=>buildFallbackEarth());
+  loader.load(urls.spec, (t)=>{ tex.spec=t; tryBuildEarth(); }, undefined, ()=>buildFallbackEarth());
+  setTimeout(() => { if (!earthBuilt) buildFallbackEarth(); }, 6000);
 
-  // Safety: if textures hang, fallback after 6s
-  setTimeout(() => { if (!earthBuilt) makeFallbackEarthOnce(); }, 6000);
+  // --- Satellite system (loaded dynamically so it cannot kill the globe)
+  let satellite = null;
 
-  // ---------- Satellites ----------
+  async function loadSatelliteLib(){
+    try{
+      // ✅ This is the key fix: real URL +esm (no bare import, no 404)
+      satellite = await import("https://cdn.jsdelivr.net/npm/satellite.js@5.0.1/+esm");
+      setStatus("READY");
+    } catch (e){
+      setStatus("SAT LIB FAILED");
+      console.error("Satellite lib failed to load:", e);
+      satellite = null;
+    }
+  }
+  loadSatelliteLib();
+
+  // Satellites state
   let sats = [];
   let selected = null;
   let satMesh = null;
@@ -586,6 +592,7 @@
   }
 
   function buildSelectedTrack(sat, minutesAhead=90, stepMin=2){
+    if (!satellite) return;
     const pts = [];
     const now = new Date();
     for (let m=0; m<=minutesAhead; m+=stepMin){
@@ -604,7 +611,7 @@
   }
 
   function updateSatPositions(now){
-    if (!satMesh || !sats.length) return;
+    if (!satellite || !satMesh || !sats.length) return;
     const t = now || new Date();
     const gmst = satellite.gstime(t);
 
@@ -631,7 +638,6 @@
         infoLat.textContent = satellite.degreesLat(geo.latitude).toFixed(2);
         infoLon.textContent = satellite.degreesLong(geo.longitude).toFixed(2);
         infoAlt.textContent = geo.height.toFixed(1);
-
         const v = pv.velocity;
         const spd = Math.sqrt(v.x*v.x + v.y*v.y + v.z*v.z);
         infoSpd.textContent = spd.toFixed(3);
@@ -643,12 +649,16 @@
   }
 
   async function loadEarthActive(){
+    if (!satellite){
+      alert("Satellite library not loaded yet. Hard refresh (Ctrl+Shift+R). If it still fails, tell me what the Console prints under 'Satellite lib failed to load'.");
+      return;
+    }
+
     setStatus("LOADING CATALOG…");
     setSelectedName("—");
     selected = null;
     clearTrack();
 
-    // CORS-friendly endpoint
     const url = "https://celestrak.org/NORAD/elements/gp.php?GROUP=active&FORMAT=tle";
     const res = await fetch(url, { cache: "no-store" });
     if (!res.ok) throw new Error(`Catalog HTTP ${res.status}`);
@@ -669,7 +679,7 @@
     renderSatList();
   }
 
-  // ---------- Planner (minimal placeholder, won’t error) ----------
+  // Minimal planner (doesn't break anything)
   function parseLatLon(str){
     const parts = (str || "").split(",").map(s => s.trim());
     if (parts.length < 2) return null;
@@ -677,26 +687,18 @@
     if (!isFinite(lat) || !isFinite(lon)) return null;
     return { lat, lon };
   }
-
   function computeLaunchOverview(){
     const ll = parseLatLon(launchLatLon.value);
-    if (!ll){
-      launchOut.value = "Invalid launch site. Use: lat,lon";
-      return;
-    }
+    if (!ll){ launchOut.value = "Invalid launch site. Use: lat,lon"; return; }
     const targetInc = Number(targetIncEl.value);
     const targetAlt = Number(targetAltEl.value);
-    if (!isFinite(targetInc) || !isFinite(targetAlt)){
-      launchOut.value = "Invalid target inclination/altitude.";
-      return;
-    }
+    if (!isFinite(targetInc) || !isFinite(targetAlt)){ launchOut.value = "Invalid inc/alt."; return; }
     launchOut.value =
       `Launch site: ${ll.lat.toFixed(4)}, ${ll.lon.toFixed(4)}\n` +
       `Target: inc ${targetInc.toFixed(1)}°, alt ${targetAlt.toFixed(0)} km\n\n` +
-      `Tip: Load satellites first to compute congestion-based metrics.\n`;
+      `Load satellites to enable congestion metrics.\n`;
   }
 
-  // ---------- Body selector ----------
   function clearAll(){
     setStatus("READY");
     sats = [];
@@ -723,13 +725,9 @@
     clearAll();
     setStatus("BODY NOT WIRED");
     catalogNoteEl.textContent = `Catalog: ${body} (not wired)`;
-    launchOut.value =
-      `Selected body: ${body}\n\n` +
-      `Earth works today because public TLE catalogs exist.\n` +
-      `For other bodies you need an orbital-elements feed.\n`;
+    launchOut.value = `Selected body: ${body}\n\nEarth works today because public TLE catalogs exist.\n`;
   }
 
-  // ---------- Wire UI ----------
   el("loadAllBtn").addEventListener("click", async () => {
     try{ await loadEarthActive(); }
     catch(e){ setStatus("ERROR"); alert(String(e?.message || e)); }
@@ -741,14 +739,13 @@
 
   onBodyChange();
 
-  // ---------- Animate loop ----------
   function animate(){
     const nowMs = performance.now();
     if (nowMs - lastPosUpdateMs > 1000){
       updateSatPositions(new Date());
       lastPosUpdateMs = nowMs;
 
-      if (selected && trackLine && (nowMs - (trackLine.userData.last || 0) > 10000)){
+      if (satellite && selected && trackLine && (nowMs - (trackLine.userData.last || 0) > 10000)){
         clearTrack();
         buildSelectedTrack(selected, 90, 2);
       }
