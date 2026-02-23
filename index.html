@@ -435,11 +435,11 @@
       buildAtmosphere();
     }
 
-    const urls = {
-      day:  "https://threejs.org/examples/textures/planets/earth_atmos_2048.jpg",
-      bump: "https://threejs.org/examples/textures/planets/earth_bump_2048.jpg",
-      spec: "https://threejs.org/examples/textures/planets/earth_specular_2048.jpg"
-    };
+   const urls = {
+  day:  "https://unpkg.com/three@0.160.0/examples/textures/planets/earth_atmos_2048.jpg",
+  bump: "https://unpkg.com/three@0.160.0/examples/textures/planets/earth_bump_2048.jpg",
+  spec: "https://unpkg.com/three@0.160.0/examples/textures/planets/earth_specular_2048.jpg"
+};
 
     let loaded = 0, failed = false;
     const tDay  = tex.load(urls.day,  () => { loaded++; maybeBuild(); }, undefined, () => { failed=true; maybeBuild(); });
@@ -836,4 +836,5 @@
   </script>
 </body>
 </html>
+
 
