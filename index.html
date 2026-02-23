@@ -338,9 +338,7 @@
     </div>
   </div>
 
-<!-- satellite.js as GLOBAL -->
-<script data-cfasync="false" src="https://cdn.jsdelivr.net/npm/satellite.js@5.0.1/dist/satellite.min.js"></script>
-
+<!-- Importmap for THREE -->
 <script type="importmap">
 {
   "imports": {
@@ -354,6 +352,10 @@
   import * as THREE from "three";
   import { OrbitControls } from "three/addons/controls/OrbitControls.js";
 
+  // IMPORTANT: satellite.js as a real ES module (no window.satellite, no Rocket Loader issues)
+  import * as satellite from "https://esm.sh/satellite.js@5.0.1?bundle";
+
+  // UI helpers
   const el = (id) => document.getElementById(id);
 
   // Wait for satellite.js to exist (Rocket Loader / script ordering can delay it)
@@ -852,6 +854,7 @@
   </script>
 </body>
 </html>
+
 
 
 
