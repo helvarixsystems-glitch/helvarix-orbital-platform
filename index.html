@@ -770,9 +770,6 @@ function ecefKmToScene(v){
 
   return earthLoadPromise;
 }
-    if (!res.ok) throw new Error("Catalog HTTP " + res.status);
-
-    const text = await res.text();
 
     // --- keep the rest of your existing loadEarthActive() code here ---
     // parseTleText(text)
@@ -1104,6 +1101,7 @@ if (bodySelectEl.value === "earth") {
   </script>
 </body>
 </html>
+
 
 
 
