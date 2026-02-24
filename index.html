@@ -51,10 +51,12 @@
       z-index:10;
     }
     .panel.left{ left:18px; }
-    .panel.right{
+ .panel.right{
   right:18px;
   width:340px;
-  height: calc(100vh - 36px);  /* top=18px, bottom=18px */
+  bottom: 240px;              /* adjust this number if needed */
+  height: auto;               /* let top+bottom define height */
+
   display:flex;
   flex-direction:column;
 }
@@ -799,6 +801,7 @@ console.log("satellite.js loaded", !!satellite);
   </script>
 </body>
 </html>
+
 
 
 
