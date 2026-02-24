@@ -89,7 +89,12 @@
     }
 
     .panelBody{ padding:12px 14px 14px; }
-
+.panel.right .panelBody{
+  padding:12px 14px 14px;
+  display:flex;
+  flex-direction:column;
+  min-height:0; /* ✅ critical so overflow works inside flex */
+}
     label{
       display:block;
       font-size:11px;
@@ -158,11 +163,12 @@
       margin-top:8px;
     }
 
-    .satList{
+.satList{
   margin-top:10px;
   border-top:1px solid rgba(120,160,255,.12);
   padding-top:10px;
-  max-height: calc(100vh - 420px); /* adjust 420px if you want more/less list */
+  flex:1;       
+  min-height:0;  
   overflow:auto;
 }
     .satItem{
@@ -793,6 +799,7 @@ console.log("satellite.js loaded", !!satellite);
   </script>
 </body>
 </html>
+
 
 
 
