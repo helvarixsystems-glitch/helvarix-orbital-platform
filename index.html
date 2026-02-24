@@ -478,9 +478,9 @@
       texLoader.crossOrigin = ("anonymous");
 
       const urls = {
-         day:  "https://threejs.org/examples/textures/planets/earth_atmos_2048.jpg",
-         bump: "https://threejs.org/examples/textures/planets/earth_bump_2048.jpg",
-         spec: "https://threejs.org/examples/textures/planets/earth_specular_2048.jpg"
+  day:  "https://threejs.org/examples/textures/planets/earth_atmos_2048.jpg",
+  bump: "https://threejs.org/examples/textures/planets/earth_normal_2048.jpg",
+  spec: "https://threejs.org/examples/textures/planets/earth_specular_2048.jpg"
       };
 
       const tex = { day:null, bump:null, spec:null };
@@ -489,14 +489,13 @@
         if (!tex.day || !tex.bump || !tex.spec) return;
         earthBuilt = true;
 
-        const mat = new THREE.MeshPhongMaterial({
-          map: tex.day,
-          bumpMap: tex.bump,
-          bumpScale: 0.6,
-          specularMap: tex.spec,
-          specular: new THREE.Color(0x222222),
-          shininess: 12
-        });
+       const mat = new THREE.MeshPhongMaterial({
+  map: tex.day,
+  normalMap: tex.bump,         
+  specularMap: tex.spec,
+  specular: new THREE.Color(0x222222),
+  shininess: 12
+});
         earthGroup.add(new THREE.Mesh(earthGeom, mat));
         buildAtmosphere();
       }
@@ -777,6 +776,7 @@
   </script>
 </body>
 </html>
+
 
 
 
