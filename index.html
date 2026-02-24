@@ -771,48 +771,7 @@ function ecefKmToScene(v){
   return earthLoadPromise;
 }
 
-    // --- keep the rest of your existing loadEarthActive() code here ---
-    // parseTleText(text)
-    // sats = ...
-    // buildSatInstancedMesh(...)
-    // updateSatCount(...)
-    // catalogNoteEl.textContent = ...
-    // setStatus("READY")
-    // renderSatList()
-
-  })().finally(() => {
-    earthLoadPromise = null; // ✅ allow future reloads
-  });
-
-  return earthLoadPromise;
-}
-
-let res;
-try {
-  res = await fetch(url, { cache: "no-store", signal: ctrl.signal });
-} finally {
-  clearTimeout(timer);
-}
-
-if (!res.ok) throw new Error("Catalog HTTP " + res.status);
-
-const text = await res.text();
-        const items = parseTleText(text);
-
-        sats = items.map(it => {
-          const sr = satellite.twoline2satrec(it.l1, it.l2);
-          const inclDeg = sr.inclo * 180 / Math.PI;
-          return { name: it.name, norad: it.norad, satrec: sr, inclDeg, meshIndex: -1 };
-        });
-
-        buildSatInstancedMesh(sats.length);
-        updateSatCount(sats.length);
-        catalogNoteEl.textContent = "Catalog: Earth / active (" + sats.length + " objects)";
-        setStatus("READY");
-        renderSatList();
-      }
-
-      function clearAll(){
+        function clearAll(){
         setStatus("READY");
         sats = [];
         selected = null;
@@ -836,8 +795,19 @@ function onBodyChange(){
     catalogNoteEl.textContent = "Catalog: Earth / active (loading…)";
     setStatus("LOADING…");
 
+    loadEarthActive().catch(e => {
+      setStatus("ERROR");
+      alert(String(e));
+    });
+
     return;
   }
+
+  clearAll();
+  setStatus("BODY NOT WIRED");
+  catalogNoteEl.textContent = "Catalog: " + body + " (not wired)";
+  launchOut.value = "Selected body: " + body + "\n\nNo public catalog wired for this body yet.\n";
+}
 
   clearAll();
   setStatus("BODY NOT WIRED");
@@ -1059,17 +1029,7 @@ el("downloadLaunchBtn").addEventListener("click", () => {
 
 searchEl.addEventListener("input", renderSatList);
 bodySelectEl.addEventListener("change", onBodyChange);
-
-
-bodySelectEl.addEventListener("change", onBodyChange);
-if (bodySelectEl.value === "earth") {
-  loadEarthActive().catch(e => { 
-    setStatus("ERROR"); 
-    alert(String(e)); 
-  });
-} else {
-  clearAll();
-}
+onBodyChange(); // ✅ triggers auto-load if Earth is selected
 
       // Animate loop
       function animate(){
@@ -1101,6 +1061,7 @@ if (bodySelectEl.value === "earth") {
   </script>
 </body>
 </html>
+
 
 
 
