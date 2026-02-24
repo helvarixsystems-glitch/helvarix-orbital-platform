@@ -294,17 +294,23 @@
             <input id="targetAlt" value="400" />
           </div>
         </div>
-
+<div class="row">
+  <div>
+    <label>Target RAAN (deg, optional)</label>
+    <input id="targetRAAN"
+           placeholder="0–360 (leave blank for lighting schedule only)"
+           autocomplete="off" />
+  </div>
+</div>
         <button id="launchBtn" class="btn">Compute launch window overview</button>
 
         <label>Launch window overview (UTC)</label>
         <textarea id="launchOut" placeholder="Recommendations will appear here..."></textarea>
-
+<button id="downloadLaunchBtn" class="btn secondary">Download launch overview (.txt)</button>
         <div class="note">
           Planner uses free weather data + a simple “orbital congestion index” (how many active sats cluster near your target incl/alt).
         </div>
 
-        <button id="loadAllBtn" class="btn">Load all active satellites</button>
         <button id="clearBtn" class="btn secondary">Clear</button>
       </div>
     </div>
@@ -410,7 +416,17 @@ console.log("satellite.js loaded", !!satellite);
         if (infoName) infoName.textContent = s;
       }
       function updateSatCount(n){ if (satCountEl) satCountEl.textContent = String(n); }
-
+function downloadText(filename, text){
+  const blob = new Blob([text], { type: "text/plain;charset=utf-8" });
+  const url = URL.createObjectURL(blob);
+  const a = document.createElement("a");
+  a.href = url;
+  a.download = filename;
+  document.body.appendChild(a);
+  a.click();
+  a.remove();
+  URL.revokeObjectURL(url);
+}
       // ---------- Hard dependency checks ----------
       if (!THREE) {
         setStatus("THREE FAILED");
@@ -750,17 +766,21 @@ function ecefKmToScene(v){
         }
       }
 
-      function onBodyChange(){
-        const body = bodySelectEl.value;
-        if (body === "earth"){
-          catalogNoteEl.textContent = "Catalog: Earth / active (ready)";
-          return;
-        }
-        clearAll();
-        setStatus("BODY NOT WIRED");
-        catalogNoteEl.textContent = "Catalog: " + body + " (not wired)";
-        launchOut.value = "Selected body: " + body + "\n\nEarth works today because public TLE catalogs exist.\n";
-      }
+function onBodyChange(){
+  const body = bodySelectEl.value;
+
+  if (body === "earth"){
+    catalogNoteEl.textContent = "Catalog: Earth / active (loading…)";
+    setStatus("LOADING…");
+
+    return;
+  }
+
+  clearAll();
+  setStatus("BODY NOT WIRED");
+  catalogNoteEl.textContent = "Catalog: " + body + " (not wired)";
+  launchOut.value = "Selected body: " + body + "\n\nNo public catalog wired for this body yet.\n";
+}
 
      function computeLaunchOverview(){
   // ---- helpers ----
@@ -956,20 +976,26 @@ function ecefKmToScene(v){
     lines.push(`${ts}   ${el.toFixed(1).padStart(5)}°  ${cond.padEnd(18)}  ${go} ${note}`);
   }
 
-  lines.push("");
-  lines.push("NOTES:");
-  lines.push("- This tool currently uses: reachability + lighting + congestion-from-catalog.");
-  lines.push("- To make it “mission-grade”, we’d add: vehicle performance, azimuth constraints, overflight corridors, winds, and a target RAAN/LTAN.");
-
+ 
   launchOut.value = lines.join("\n");
 }
 
       // Wire UI
-      el("loadAllBtn").addEventListener("click", () => loadEarthActive().catch(e => { setStatus("ERROR"); alert(String(e)); }));
       el("clearBtn").addEventListener("click", clearAll);
-      el("launchBtn").addEventListener("click", computeLaunchOverview);
-      searchEl.addEventListener("input", renderSatList);
-      bodySelectEl.addEventListener("change", onBodyChange);
+el("launchBtn").addEventListener("click", computeLaunchOverview);
+
+el("downloadLaunchBtn").addEventListener("click", () => {
+  const txt = (launchOut.value || "").trim();
+  if (!txt){
+    alert("No launch overview yet. Click Compute Launch Window Overview first.");
+    return;
+  }
+  const stamp = new Date().toISOString().replace(/[:.]/g,"-");
+  downloadText(`launch-overview-${stamp}.txt`, txt + "\n");
+});
+
+searchEl.addEventListener("input", renderSatList);
+bodySelectEl.addEventListener("change", onBodyChange);
 
       onBodyChange();
 
@@ -1003,6 +1029,7 @@ function ecefKmToScene(v){
   </script>
 </body>
 </html>
+
 
 
 
