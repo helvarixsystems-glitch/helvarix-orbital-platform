@@ -788,10 +788,10 @@ function ecefKmToScene(v){
         }
       }
 
-function onBodyChange(){
+function onBodyChange() {
   const body = bodySelectEl.value;
 
-  if (body === "earth"){
+  if (body === "earth") {
     catalogNoteEl.textContent = "Catalog: Earth / active (loading…)";
     setStatus("LOADING…");
 
@@ -806,15 +806,9 @@ function onBodyChange(){
   clearAll();
   setStatus("BODY NOT WIRED");
   catalogNoteEl.textContent = "Catalog: " + body + " (not wired)";
-  launchOut.value = "Selected body: " + body + "\n\nNo public catalog wired for this body yet.\n";
+  launchOut.value =
+    "Selected body: " + body + "\n\nNo public catalog wired for this body yet.\n";
 }
-
-  clearAll();
-  setStatus("BODY NOT WIRED");
-  catalogNoteEl.textContent = "Catalog: " + body + " (not wired)";
-  launchOut.value = "Selected body: " + body + "\n\nNo public catalog wired for this body yet.\n";
-}
-
      function computeLaunchOverview(){
   // ---- helpers ----
   const rad = (d) => d * Math.PI / 180;
@@ -1061,6 +1055,7 @@ onBodyChange(); // ✅ triggers auto-load if Earth is selected
   </script>
 </body>
 </html>
+
 
 
 
