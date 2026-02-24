@@ -541,8 +541,14 @@ console.log("satellite.js loaded", !!satellite);
       const SAT_COLOR_DEFAULT = new THREE.Color(0x00E6FF);
       const SAT_COLOR_SELECTED = new THREE.Color(0xFFCC33);
 
-      function ecefKmToScene(v){
-  return new THREE.Vector3(v.x * SCALE, v.y * SCALE, v.z * SCALE);
+function ecefKmToScene(v){
+  // ECEF: x=Greenwich, y=90E, z=North
+  // Three.js: y=Up (North), x=Right, z=Forward
+  return new THREE.Vector3(
+    v.x * SCALE,   // x stays x
+    v.z * SCALE,   // z -> y (north becomes up)
+    -v.y * SCALE   // y -> -z (90E becomes -forward)
+  );
 }
 
       function parseTleText(text){
@@ -801,6 +807,7 @@ console.log("satellite.js loaded", !!satellite);
   </script>
 </body>
 </html>
+
 
 
 
