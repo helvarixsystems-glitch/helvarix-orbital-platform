@@ -740,7 +740,6 @@
       onBodyChange();
 
       // Animate loop
-      let lastPosUpdateMs = 0; // (kept, but ensure defined once)
       function animate(){
         const nowMs = performance.now();
         if (nowMs - lastPosUpdateMs > 1000){
@@ -770,3 +769,4 @@
   </script>
 </body>
 </html>
+
