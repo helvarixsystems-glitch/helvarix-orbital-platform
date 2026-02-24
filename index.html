@@ -719,14 +719,14 @@ function ecefKmToScene(v){
         }
       }
 
-      async function loadEarthActive(){
-  // ✅ if already loading, reuse the same promise
+     async function loadEarthActive(){
+  // ✅ reuse inflight load (prevents duplicates)
   if (earthLoadPromise) return earthLoadPromise;
 
   earthLoadPromise = (async () => {
-
     if (!satellite){
-      alert("satellite.js is not loaded, so satellites are disabled. The globe should still render. Check the Network tab for satellite.min.js.");
+      setStatus("SAT DISABLED");
+      alert("satellite.js is not loaded, so satellites are disabled.");
       return;
     }
 
@@ -748,6 +748,28 @@ function ecefKmToScene(v){
       clearTimeout(timer);
     }
 
+    if (!res.ok) throw new Error("Catalog HTTP " + res.status);
+
+    const text = await res.text();
+    const items = parseTleText(text);
+
+    sats = items.map(it => {
+      const sr = satellite.twoline2satrec(it.l1, it.l2);
+      const inclDeg = sr.inclo * 180 / Math.PI;
+      return { name: it.name, norad: it.norad, satrec: sr, inclDeg, meshIndex: -1 };
+    });
+
+    buildSatInstancedMesh(sats.length);
+    updateSatCount(sats.length);
+    catalogNoteEl.textContent = "Catalog: Earth / active (" + sats.length + " objects)";
+    setStatus("READY");
+    renderSatList();
+  })();
+
+  earthLoadPromise.finally(() => { earthLoadPromise = null; });
+
+  return earthLoadPromise;
+}
     if (!res.ok) throw new Error("Catalog HTTP " + res.status);
 
     const text = await res.text();
@@ -1082,6 +1104,7 @@ if (bodySelectEl.value === "earth") {
   </script>
 </body>
 </html>
+
 
 
 
