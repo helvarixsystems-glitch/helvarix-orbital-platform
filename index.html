@@ -337,7 +337,6 @@
   </div>
 
   <!-- satellite.js stays non-module (UMD global window.satellite) -->
-  <script data-cfasync="false" src="https://unpkg.com/satellite.js@5.0.1/dist/satellite.min.js"></script>
 <script type="importmap">
 {
   "imports": {
@@ -350,6 +349,7 @@
 <script type="module">
   import * as THREE from "three";
   import { OrbitControls } from "https://cdn.jsdelivr.net/npm/three@0.148.0/examples/jsm/controls/OrbitControls.js";
+  import * as satellite from "https://cdn.jsdelivr.net/npm/satellite.js@5.0.1/+esm";
 
 
     (function () {
@@ -401,8 +401,8 @@
       }
 
       // satellite is optional (globe should still render)
-      const satellite = window.satellite || null;
-      if (!satellite) console.warn("satellite.js not loaded (sat features will be disabled).");
+      // satellite is imported; if this runs, it loaded.
+console.log("satellite.js loaded", !!satellite);
 
       // ---------- Wire presets ----------
       if (presetEl) {
@@ -517,8 +517,8 @@
       const SAT_COLOR_SELECTED = new THREE.Color(0xFFCC33);
 
       function ecefKmToScene(v){
-        return new THREE.Vector3(v.x * SCALE, v.z * SCALE, v.y * SCALE);
-      }
+  return new THREE.Vector3(v.x * SCALE, v.y * SCALE, v.z * SCALE);
+}
 
       function parseTleText(text){
         const lines = text.split(/\r?\n/).map(l=>l.trim()).filter(Boolean);
@@ -776,6 +776,7 @@
   </script>
 </body>
 </html>
+
 
 
 
