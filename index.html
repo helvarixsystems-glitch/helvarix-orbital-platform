@@ -349,7 +349,13 @@
 <script type="module">
   import * as THREE from "three";
   import { OrbitControls } from "https://cdn.jsdelivr.net/npm/three@0.148.0/examples/jsm/controls/OrbitControls.js";
-  import * as satellite from "https://cdn.jsdelivr.net/npm/satellite.js@5.0.1/+esm";
+ let satellite = null;
+try {
+  satellite = await import("https://esm.sh/satellite.js@5.0.1");
+  console.log("satellite.js loaded");
+} catch (e) {
+  console.warn("satellite.js not loaded (sat features disabled).", e);
+}
 
 
     (function () {
@@ -776,6 +782,7 @@ console.log("satellite.js loaded", !!satellite);
   </script>
 </body>
 </html>
+
 
 
 
