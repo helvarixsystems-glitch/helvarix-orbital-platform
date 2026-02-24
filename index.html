@@ -500,7 +500,7 @@ console.log("satellite.js loaded", !!satellite);
       }
 
       const texLoader = new THREE.TextureLoader();
-      texLoader.crossOrigin = ("anonymous");
+      texLoader.setCrossOrigin = ("anonymous");
 
       const urls = {
   day:  "https://threejs.org/examples/textures/planets/earth_atmos_2048.jpg",
@@ -762,11 +762,207 @@ function ecefKmToScene(v){
         launchOut.value = "Selected body: " + body + "\n\nEarth works today because public TLE catalogs exist.\n";
       }
 
-      function computeLaunchOverview(){
-        launchOut.value =
-          "This is the overview placeholder.\n\n" +
-          "Next step: we can add weather + congestion scoring back once the base loads reliably.\n";
-      }
+     function computeLaunchOverview(){
+  // ---- helpers ----
+  const rad = (d) => d * Math.PI / 180;
+  const deg = (r) => r * 180 / Math.PI;
+  const clamp = (x, a, b) => Math.min(b, Math.max(a, x));
+
+  function parseLatLon(text){
+    const parts = String(text).split(",").map(s => s.trim());
+    if (parts.length !== 2) throw new Error("Launch site must be 'lat,lon'");
+    const lat = Number(parts[0]);
+    const lon = Number(parts[1]);
+    if (!isFinite(lat) || !isFinite(lon)) throw new Error("Launch site lat/lon must be numbers");
+    if (lat < -90 || lat > 90) throw new Error("Latitude must be between -90 and 90");
+    if (lon < -180 || lon > 180) throw new Error("Longitude must be between -180 and 180");
+    return { lat, lon };
+  }
+
+  // Julian day
+  function toJulian(date){
+    return date.getTime()/86400000 + 2440587.5;
+  }
+
+  // Approx solar elevation (deg) at given lat/lon/time (good enough for day/twilight/night windows)
+  function solarElevationDeg(date, latDeg, lonDeg){
+    const jd = toJulian(date);
+    const n = jd - 2451545.0;
+
+    // Mean longitude & anomaly of the Sun (deg)
+    const L = (280.460 + 0.9856474 * n) % 360;
+    const g = rad((357.528 + 0.9856003 * n) % 360);
+
+    // Ecliptic longitude (deg)
+    const lambda = rad((L + 1.915*Math.sin(g) + 0.020*Math.sin(2*g)) % 360);
+
+    // Obliquity (rad)
+    const eps = rad(23.439 - 0.0000004 * n);
+
+    // RA/Dec
+    const sinLambda = Math.sin(lambda), cosLambda = Math.cos(lambda);
+    const sinEps = Math.sin(eps), cosEps = Math.cos(eps);
+
+    const alpha = Math.atan2(cosEps*sinLambda, cosLambda); // RA (rad)
+    const delta = Math.asin(sinEps*sinLambda);             // Dec (rad)
+
+    // Greenwich Mean Sidereal Time (deg)
+    const T = (jd - 2451545.0)/36525.0;
+    let GMST = 280.46061837 + 360.98564736629*(jd - 2451545.0) + 0.000387933*T*T - (T*T*T)/38710000.0;
+    GMST = ((GMST % 360) + 360) % 360;
+
+    // Local sidereal time (rad)
+    const LST = rad(((GMST + lonDeg) % 360 + 360) % 360);
+
+    // Hour angle (rad)
+    const H = LST - alpha;
+
+    const lat = rad(latDeg);
+    const sinEl = Math.sin(lat)*Math.sin(delta) + Math.cos(lat)*Math.cos(delta)*Math.cos(H);
+    return deg(Math.asin(clamp(sinEl, -1, 1)));
+  }
+
+  function classifyLight(elDeg){
+    if (elDeg > 0) return "DAY";
+    if (elDeg > -6) return "CIVIL TWILIGHT";
+    if (elDeg > -12) return "NAUTICAL TWILIGHT";
+    if (elDeg > -18) return "ASTRO TWILIGHT";
+    return "NIGHT";
+  }
+
+  // ---- inputs ----
+  let site, incDeg, altKm;
+  try {
+    site = parseLatLon(launchLatLon.value);
+    incDeg = Number(targetIncEl.value);
+    altKm = Number(targetAltEl.value);
+    if (!isFinite(incDeg) || incDeg <= 0 || incDeg >= 180) throw new Error("Inclination must be between 0 and 180 deg");
+    if (!isFinite(altKm) || altKm < 120 || altKm > 50000) throw new Error("Altitude must be a reasonable value in km (e.g., 120–50000)");
+  } catch (e){
+    launchOut.value = "INPUT ERROR:\n" + String(e.message || e);
+    return;
+  }
+
+  const latAbs = Math.abs(site.lat);
+
+  // ---- reachability + azimuths ----
+  // For a due-east launch, inclination ~= latitude. General relationship:
+  // sin(Az_from_north) = cos(i)/cos(phi)  (prograde solution)
+  let reachable = incDeg >= latAbs && incDeg <= (180 - latAbs);
+  let azPrograde = null;
+  let azRetrograde = null;
+
+  if (reachable){
+    const phi = rad(site.lat);
+    const i = rad(incDeg);
+    const ratio = clamp(Math.cos(i)/Math.cos(phi), -1, 1);
+    const Az = Math.asin(ratio);            // from North toward East (rad), range [-90, +90]
+    azPrograde = (deg(Az) + 360) % 360;     // 0..360
+    azRetrograde = (180 - azPrograde + 360) % 360;
+  }
+
+  // ---- simple performance estimates ----
+  const MU = 398600.4418; // km^3/s^2
+  const r = EARTH_KM + altKm;         // km
+  const vOrb = Math.sqrt(MU / r);     // km/s circular orbit
+  const vRotEq = 0.465101;            // km/s at equator
+  const vRot = vRotEq * Math.cos(rad(site.lat)); // km/s at latitude
+
+  // Rotation assist along the launch direction ~ east-component
+  let assistPro = null, assistRetro = null;
+  if (reachable){
+    const eastComponentPro = Math.sin(rad(azPrograde));  // if Az is from North
+    assistPro = vRot * eastComponentPro;                 // km/s
+    const eastComponentRetro = Math.sin(rad(azRetrograde));
+    assistRetro = vRot * eastComponentRetro;
+  }
+
+  // ---- congestion index (uses your loaded sats) ----
+  // Count sats near inclination +/-2deg and current altitude +/-50km
+  let congestionText = "Congestion: (sat catalog not loaded)";
+  if (satellite && sats && sats.length){
+    const now = new Date();
+    const gmst = satellite.gstime(now);
+    const incTol = 2.0;
+    const altTol = 50.0;
+
+    let inBand = 0;
+    for (const s of sats){
+      if (Math.abs((s.inclDeg ?? 0) - incDeg) > incTol) continue;
+
+      // Estimate current altitude from propagation
+      const pv = satellite.propagate(s.satrec, now);
+      if (!pv.position) continue;
+      const geo = satellite.eciToGeodetic(pv.position, gmst);
+      const h = geo.height; // km
+      if (Math.abs(h - altKm) <= altTol) inBand++;
+    }
+
+    // Normalize to something understandable (not “perfect science”, but useful signal)
+    const pct = (inBand / sats.length) * 100;
+    congestionText = `Congestion: ${inBand} sats within ±${incTol}° incl and ±${altTol} km alt (${pct.toFixed(2)}% of loaded catalog)`;
+  }
+
+  // ---- build a 24h “window schedule” based on site lighting ----
+  const start = new Date();
+  const stepMin = 30;
+  const steps = Math.floor((24 * 60) / stepMin);
+
+  let lines = [];
+  lines.push("LAUNCH WINDOW OVERVIEW (UTC)");
+  lines.push("------------------------------------------------------------");
+  lines.push(`Site: lat ${site.lat.toFixed(4)}, lon ${site.lon.toFixed(4)}`);
+  lines.push(`Target: inc ${incDeg.toFixed(2)}°, alt ${altKm.toFixed(0)} km`);
+  lines.push("");
+
+  if (!reachable){
+    lines.push("REACHABILITY: ❌ NOT DIRECTLY REACHABLE from this latitude");
+    lines.push(`Rule of thumb: inclination must be ≥ |latitude|. Here |lat|=${latAbs.toFixed(2)}°`);
+    lines.push("You would need a dogleg, plane change, or a different site.");
+  } else {
+    lines.push("REACHABILITY: ✅ DIRECTLY REACHABLE");
+    lines.push(`Suggested azimuths (from North → East):`);
+    lines.push(`  Prograde:   ${azPrograde.toFixed(1)}°   (rotation assist ~ ${assistPro.toFixed(3)} km/s)`);
+    lines.push(`  Retrograde: ${azRetrograde.toFixed(1)}°   (rotation assist ~ ${assistRetro.toFixed(3)} km/s)`);
+  }
+
+  lines.push("");
+  lines.push(`Orbital speed @ ${altKm.toFixed(0)} km (circular): ~${vOrb.toFixed(3)} km/s`);
+  lines.push(congestionText);
+  lines.push("");
+
+  lines.push("NEXT 24 HOURS (lighting at site):");
+  lines.push("Time (UTC)            SunEl   Condition            Go/Note");
+  lines.push("------------------------------------------------------------");
+
+  for (let k=0; k<=steps; k++){
+    const t = new Date(start.getTime() + k*stepMin*60*1000);
+    const el = solarElevationDeg(t, site.lat, site.lon);
+    const cond = classifyLight(el);
+
+    // Simple “GO” heuristic (you can refine later):
+    // - If unreachable => all “NO”
+    // - If reachable => prefer NIGHT or TWILIGHT, allow DAY with caution
+    let go = "NO";
+    let note = "";
+    if (reachable){
+      if (cond === "NIGHT" || cond.includes("TWILIGHT")) { go = "GO"; note = "better visuals/ops"; }
+      else { go = "CAUTION"; note = "daylight"; }
+    } else {
+      note = "inclination not reachable";
+    }
+
+    const ts = t.toISOString().replace("T"," ").slice(0,16) + "Z";
+    lines.push(`${ts}   ${el.toFixed(1).padStart(5)}°  ${cond.padEnd(18)}  ${go} ${note}`);
+  }
+
+  lines.push("");
+  lines.push("NOTES:");
+  lines.push("- This tool currently uses: reachability + lighting + congestion-from-catalog.");
+  lines.push("- To make it “mission-grade”, we’d add: vehicle performance, azimuth constraints, overflight corridors, winds, and a target RAAN/LTAN.");
+
+  launchOut.value = lines.join("\n");
+}
 
       // Wire UI
       el("loadAllBtn").addEventListener("click", () => loadEarthActive().catch(e => { setStatus("ERROR"); alert(String(e)); }));
@@ -807,6 +1003,7 @@ function ecefKmToScene(v){
   </script>
 </body>
 </html>
+
 
 
 
