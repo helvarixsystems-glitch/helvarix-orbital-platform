@@ -548,7 +548,8 @@ console.log("satellite.js loaded", !!satellite);
 
       // ---------- Satellites ----------
       let sats = [];
-      let selected = null;
+let selected = null;
+let earthLoadPromise = null; 
       let satMesh = null;
       let trackLine = null;
       let lastPosUpdateMs = 0;
@@ -719,21 +720,64 @@ function ecefKmToScene(v){
       }
 
       async function loadEarthActive(){
-        if (!satellite){
-          alert("satellite.js is not loaded, so satellites are disabled. The globe should still render. Check the Network tab for satellite.min.js.");
-          return;
-        }
+  // ✅ if already loading, reuse the same promise
+  if (earthLoadPromise) return earthLoadPromise;
 
-        setStatus("LOADING CATALOG…");
-        setSelectedName("—");
-        selected = null;
-        clearTrack();
+  earthLoadPromise = (async () => {
 
-        const url = "https://celestrak.org/NORAD/elements/gp.php?GROUP=active&FORMAT=tle";
-        const res = await fetch(url, { cache: "no-store" });
-        if (!res.ok) throw new Error("Catalog HTTP " + res.status);
+    if (!satellite){
+      alert("satellite.js is not loaded, so satellites are disabled. The globe should still render. Check the Network tab for satellite.min.js.");
+      return;
+    }
 
-        const text = await res.text();
+    setStatus("LOADING CATALOG…");
+    setSelectedName("—");
+    selected = null;
+    clearTrack();
+
+    const url = "https://celestrak.org/NORAD/elements/gp.php?GROUP=active&FORMAT=tle";
+
+    // ✅ 20s timeout so it can’t hang forever
+    const ctrl = new AbortController();
+    const timer = setTimeout(() => ctrl.abort(), 20000);
+
+    let res;
+    try {
+      res = await fetch(url, { cache: "no-store", signal: ctrl.signal });
+    } finally {
+      clearTimeout(timer);
+    }
+
+    if (!res.ok) throw new Error("Catalog HTTP " + res.status);
+
+    const text = await res.text();
+
+    // --- keep the rest of your existing loadEarthActive() code here ---
+    // parseTleText(text)
+    // sats = ...
+    // buildSatInstancedMesh(...)
+    // updateSatCount(...)
+    // catalogNoteEl.textContent = ...
+    // setStatus("READY")
+    // renderSatList()
+
+  })().finally(() => {
+    earthLoadPromise = null; // ✅ allow future reloads
+  });
+
+  return earthLoadPromise;
+}
+
+let res;
+try {
+  res = await fetch(url, { cache: "no-store", signal: ctrl.signal });
+} finally {
+  clearTimeout(timer);
+}
+
+if (!res.ok) throw new Error("Catalog HTTP " + res.status);
+
+const text = await res.text();
         const items = parseTleText(text);
 
         sats = items.map(it => {
@@ -997,7 +1041,16 @@ el("downloadLaunchBtn").addEventListener("click", () => {
 searchEl.addEventListener("input", renderSatList);
 bodySelectEl.addEventListener("change", onBodyChange);
 
-      onBodyChange();
+
+bodySelectEl.addEventListener("change", onBodyChange);
+if (bodySelectEl.value === "earth") {
+  loadEarthActive().catch(e => { 
+    setStatus("ERROR"); 
+    alert(String(e)); 
+  });
+} else {
+  clearAll();
+}
 
       // Animate loop
       function animate(){
@@ -1029,6 +1082,7 @@ bodySelectEl.addEventListener("change", onBodyChange);
   </script>
 </body>
 </html>
+
 
 
 
