@@ -51,7 +51,23 @@
       z-index:10;
     }
     .panel.left{ left:18px; }
-    .panel.right{ right:18px; width:340px; }
+    .panel.right{
+  right:18px;
+  width:340px;
+  height: calc(100vh - 36px);  /* top=18px, bottom=18px */
+  display:flex;
+  flex-direction:column;
+}
+.panel.right .panelBody{
+  display:flex;
+  flex-direction:column;
+  min-height:0; /* ✅ important so overflow works inside flex */
+}
+.satList{
+  flex:1;        /* ✅ list takes remaining space */
+  min-height:0;  /* ✅ allows it to shrink */
+  overflow:auto;
+}
 
     .panelHeader{
       padding:14px 14px 10px;
@@ -143,12 +159,12 @@
     }
 
     .satList{
-      margin-top:10px;
-      border-top:1px solid rgba(120,160,255,.12);
-      padding-top:10px;
-      max-height:35vh;
-      overflow:auto;
-    }
+  margin-top:10px;
+  border-top:1px solid rgba(120,160,255,.12);
+  padding-top:10px;
+  max-height: calc(100vh - 420px); /* adjust 420px if you want more/less list */
+  overflow:auto;
+}
     .satItem{
       display:flex; align-items:center; justify-content:space-between;
       padding:9px 10px;
@@ -777,6 +793,7 @@ console.log("satellite.js loaded", !!satellite);
   </script>
 </body>
 </html>
+
 
 
 
