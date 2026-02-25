@@ -495,7 +495,15 @@ function downloadText(filename, text){
       scene.add(earthGroup);
 
       const earthGeom = new THREE.SphereGeometry(R, 96, 96);
+let planetMesh = new THREE.Mesh(
+  earthGeom,
+  new THREE.MeshStandardMaterial({ color: 0x223355, roughness: 1.0 })
+);
+earthGroup.add(planetMesh);
+buildAtmosphere(); 
 
+let earthBuilt = true; 
+      
       function buildAtmosphere(){
         const atmoGeom = new THREE.SphereGeometry(R * 1.02, 96, 96);
         const atmoMat  = new THREE.MeshBasicMaterial({ color: 0x00E6FF, transparent:true, opacity:0.05 });
@@ -504,12 +512,18 @@ function downloadText(filename, text){
 
       let earthBuilt = false;
       function buildFallbackEarth(){
-        if (earthBuilt) return;
-        earthBuilt = true;
-        const mat = new THREE.MeshStandardMaterial({
-          color: 0x0B1530, roughness:0.85, metalness:0.10,
-          emissive: new THREE.Color(0x08122A), emissiveIntensity:1.25
-        });
+  if (!planetMesh) return;
+
+  planetMesh.material = new THREE.MeshStandardMaterial({
+    color: 0x0B1530,
+    roughness: 0.85,
+    metalness: 0.10,
+    emissive: new THREE.Color(0x08122A),
+    emissiveIntensity: 1.25
+  });
+
+  planetMesh.material.needsUpdate = true;
+}
        planetMesh = new THREE.Mesh(
   earthGeom,
   new THREE.MeshStandardMaterial({ color: 0x223355, roughness: 1.0 })
@@ -536,43 +550,61 @@ const BODY_URLS = {
   },
 
   mars: {
-    map: "https://cdn.jsdelivr.net/gh/mrdoob/three.js@r148/examples/textures/planets/mars_1024.jpg"
+    map: "https://upload.wikimedia.org/wikipedia/commons/0/02/Solarsystemscope_texture_2k_mars.jpg"
   },
 
   jupiter: {
-    map: "https://cdn.jsdelivr.net/gh/mrdoob/three.js@r148/examples/textures/planets/jupiter2_1024.jpg"
+    map: "https://upload.wikimedia.org/wikipedia/commons/5/5e/Solarsystemscope_texture_8k_jupiter.jpg"
   }
 
 };
       setTimeout(() => { if (!earthBuilt) buildFallbackEarth(); }, 6000);
 function switchBodyMaterial(bodyKey){
-
   const cfg = BODY_URLS[bodyKey];
-  if (!cfg) return;
+  if (!cfg || !planetMesh) return;
 
   setStatus("LOADING BODY…");
 
-  texLoader.load(cfg.map, (map) => {
+  texLoader.load(
+    cfg.map,
+    (map) => {
+      map.colorSpace = THREE.SRGBColorSpace;
 
-    map.colorSpace = THREE.SRGBColorSpace;
+      // Earth uses map + normal + spec
+      if (bodyKey === "earth" && cfg.normal && cfg.spec){
+        texLoader.load(cfg.normal, (normal) => {
+          texLoader.load(cfg.spec, (spec) => {
+            planetMesh.material = new THREE.MeshPhongMaterial({
+              map,
+              normalMap: normal,
+              specularMap: spec,
+              specular: new THREE.Color(0x222222),
+              shininess: 12
+            });
+            planetMesh.material.needsUpdate = true;
+            setStatus("READY");
+          }, undefined, () => { buildFallbackEarth(); setStatus("READY"); });
+        }, undefined, () => { buildFallbackEarth(); setStatus("READY"); });
 
-    if (bodyKey === "earth"){
-
-      texLoader.load(cfg.normal, (normal) => {
-        texLoader.load(cfg.spec, (spec) => {
-
-          planetMesh.material = new THREE.MeshPhongMaterial({
-            map,
-            normalMap: normal,
-            specularMap: spec,
-            specular: new THREE.Color(0x222222),
-            shininess: 12
-          });
-
-          planetMesh.material.needsUpdate = true;
-          setStatus("READY");
-
+      } else {
+        // Other bodies just use a basic map material
+        planetMesh.material = new THREE.MeshStandardMaterial({
+          map,
+          roughness: bodyKey === "jupiter" ? 0.95 : 1.0,
+          metalness: 0
         });
+        planetMesh.material.needsUpdate = true;
+        setStatus("READY");
+      }
+    },
+    undefined,
+    (err) => {
+      console.error("Texture load failed:", bodyKey, err);
+      buildFallbackEarth();
+      setStatus("READY");
+    }
+  );
+}
       });
 
     } else {
@@ -1107,6 +1139,7 @@ onBodyChange();
   </script>
 </body>
 </html>
+
 
 
 
