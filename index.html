@@ -500,9 +500,8 @@ let planetMesh = new THREE.Mesh(
   new THREE.MeshStandardMaterial({ color: 0x223355, roughness: 1.0 })
 );
 earthGroup.add(planetMesh);
-buildAtmosphere(); 
-
-let earthBuilt = true; 
+buildAtmosphere();
+earthBuilt = true;
       
       function buildAtmosphere(){
         const atmoGeom = new THREE.SphereGeometry(R * 1.02, 96, 96);
@@ -1139,6 +1138,7 @@ onBodyChange();
   </script>
 </body>
 </html>
+
 
 
 
