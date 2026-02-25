@@ -511,41 +511,85 @@ console.log("satellite.js loaded", !!satellite);
           color: 0x0B1530, roughness:0.85, metalness:0.10,
           emissive: new THREE.Color(0x08122A), emissiveIntensity:1.25
         });
-        earthGroup.add(new THREE.Mesh(earthGeom, mat));
-        buildAtmosphere();
+        const planetMesh = new THREE.Mesh(
+  earthGeom,
+  new THREE.MeshStandardMaterial({ color: 0x223355, roughness: 1.0 })
+);
+
+earthGroup.add(planetMesh);
+buildAtmosphere();
       }
 
       const texLoader = new THREE.TextureLoader();
-      texLoader.setCrossOrigin = ("anonymous");
+texLoader.setCrossOrigin("anonymous");
 
-      const urls = {
-  day:  "https://threejs.org/examples/textures/planets/earth_atmos_2048.jpg",
-  bump: "https://threejs.org/examples/textures/planets/earth_normal_2048.jpg",
-  spec: "https://threejs.org/examples/textures/planets/earth_specular_2048.jpg"
-      };
+// 🔹 Body texture catalog
+const BODY_URLS = {
 
-      const tex = { day:null, bump:null, spec:null };
-      function tryBuildEarth(){
-        if (earthBuilt) return;
-        if (!tex.day || !tex.bump || !tex.spec) return;
-        earthBuilt = true;
+  earth: {
+    map:  "https://cdn.apewebapps.com/threejs/160/examples/textures/planets/earth_atmos_2048.jpg",
+    normal: "https://cdn.apewebapps.com/threejs/160/examples/textures/planets/earth_normal_2048.jpg",
+    spec: "https://cdn.apewebapps.com/threejs/160/examples/textures/planets/earth_specular_2048.jpg"
+  },
 
-       const mat = new THREE.MeshPhongMaterial({
-  map: tex.day,
-  normalMap: tex.bump,         
-  specularMap: tex.spec,
-  specular: new THREE.Color(0x222222),
-  shininess: 12
-});
-        earthGroup.add(new THREE.Mesh(earthGeom, mat));
-        buildAtmosphere();
-      }
+  moon: {
+    map: "https://cdn.apewebapps.com/threejs/160/examples/textures/planets/moon_1024.jpg"
+  },
 
-      texLoader.load(urls.day,  (t)=>{ tex.day=t;  tryBuildEarth(); }, undefined, (e)=>{ console.error("DAY tex failed", urls.day, e);  buildFallbackEarth(); });
-      texLoader.load(urls.bump, (t)=>{ tex.bump=t; tryBuildEarth(); }, undefined, (e)=>{ console.error("BUMP tex failed", urls.bump, e); buildFallbackEarth(); });
-      texLoader.load(urls.spec, (t)=>{ tex.spec=t; tryBuildEarth(); }, undefined, (e)=>{ console.error("SPEC tex failed", urls.spec, e); buildFallbackEarth(); });
+  mars: {
+    map: "https://cdn.apewebapps.com/threejs/160/examples/textures/planets/mars_1024.jpg"
+  },
+
+  jupiter: {
+    map: "https://cdn.apewebapps.com/threejs/160/examples/textures/planets/jupiter2_1024.jpg"
+  }
+
+};
       setTimeout(() => { if (!earthBuilt) buildFallbackEarth(); }, 6000);
+function switchBodyMaterial(bodyKey){
 
+  const cfg = BODY_URLS[bodyKey];
+  if (!cfg) return;
+
+  setStatus("LOADING BODY…");
+
+  texLoader.load(cfg.map, (map) => {
+
+    map.colorSpace = THREE.SRGBColorSpace;
+
+    if (bodyKey === "earth"){
+
+      texLoader.load(cfg.normal, (normal) => {
+        texLoader.load(cfg.spec, (spec) => {
+
+          planetMesh.material = new THREE.MeshPhongMaterial({
+            map,
+            normalMap: normal,
+            specularMap: spec,
+            specular: new THREE.Color(0x222222),
+            shininess: 12
+          });
+
+          planetMesh.material.needsUpdate = true;
+          setStatus("READY");
+
+        });
+      });
+
+    } else {
+
+      planetMesh.material = new THREE.MeshStandardMaterial({
+        map,
+        roughness: bodyKey === "jupiter" ? 0.95 : 1.0,
+        metalness: 0
+      });
+
+      planetMesh.material.needsUpdate = true;
+      setStatus("READY");
+    }
+
+  });
+}
       // ---------- Satellites ----------
       let sats = [];
 let selected = null;
@@ -788,10 +832,13 @@ function ecefKmToScene(v){
         }
       }
 
-function onBodyChange() {
+function onBodyChange(){
   const body = bodySelectEl.value;
 
-  if (body === "earth") {
+  // 🔹 Always switch the planet material
+  switchBodyMaterial(body);
+
+  if (body === "earth"){
     catalogNoteEl.textContent = "Catalog: Earth / active (loading…)";
     setStatus("LOADING…");
 
@@ -804,10 +851,11 @@ function onBodyChange() {
   }
 
   clearAll();
-  setStatus("BODY NOT WIRED");
+  setStatus("READY");
   catalogNoteEl.textContent = "Catalog: " + body + " (not wired)";
   launchOut.value =
-    "Selected body: " + body + "\n\nNo public catalog wired for this body yet.\n";
+    "Selected body: " + body +
+    "\n\nNo public satellite catalog wired for this body yet.\n";
 }
      function computeLaunchOverview(){
   // ---- helpers ----
@@ -1023,7 +1071,10 @@ el("downloadLaunchBtn").addEventListener("click", () => {
 
 searchEl.addEventListener("input", renderSatList);
 bodySelectEl.addEventListener("change", onBodyChange);
-onBodyChange(); // ✅ triggers auto-load if Earth is selected
+
+// Load initial body
+switchBodyMaterial(bodySelectEl.value);
+onBodyChange();
 
       // Animate loop
       function animate(){
@@ -1055,6 +1106,7 @@ onBodyChange(); // ✅ triggers auto-load if Earth is selected
   </script>
 </body>
 </html>
+
 
 
 
