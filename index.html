@@ -488,7 +488,29 @@
     // ---------- Earth / Planet Mesh ----------
     const R = 100;
     const EARTH_KM = 6371;
-    const SCALE = R / EARTH_KM;
+    const SCALE = R / EARTH_KM; // Earth scale (kept for TLE/ECEF path)
+
+    // ✅ Added: body radii + current body scale for Horizons bodies
+    const BODY_RADIUS_KM = {
+      earth: 6371,
+      moon: 1737.4,
+      mars: 3389.5,
+      jupiter: 69911
+    };
+    let currentBody = "earth";
+    let currentScale = R / (BODY_RADIUS_KM[currentBody] || EARTH_KM);
+
+    // ✅ Added: Horizons center codes + initial craft lists
+    const BODY_CENTER = {
+      moon: "500@301",
+      mars: "500@499",
+      jupiter: "500@599"
+    };
+    const BODY_CRAFT_NAMES = {
+      moon: ["LRO", "CAPSTONE"],
+      mars: ["MRO", "MAVEN", "Mars Odyssey"],
+      jupiter: ["Juno"]
+    };
 
     const earthGroup = new THREE.Group();
     scene.add(earthGroup);
@@ -547,8 +569,9 @@
       },
 
       mars: {
-  map: "https://upload.wikimedia.org/wikipedia/commons/4/46/Solarsystemscope_texture_2k_mars.jpg"
-},
+        map: "https://upload.wikimedia.org/wikipedia/commons/4/46/Solarsystemscope_texture_2k_mars.jpg"
+      },
+
       jupiter: {
         map: "https://upload.wikimedia.org/wikipedia/commons/5/5e/Solarsystemscope_texture_8k_jupiter.jpg"
       }
@@ -625,6 +648,9 @@
     let trackLine = null;
     let lastPosUpdateMs = 0;
 
+    // ✅ Added: Horizons cache for current body (so it doesn't refetch constantly)
+    let horizonsLoadPromise = null;
+
     const SAT_POINT_RADIUS = 0.6;
     const SAT_COLOR_DEFAULT = new THREE.Color(0x00E6FF);
     const SAT_COLOR_SELECTED = new THREE.Color(0xFFCC33);
@@ -637,6 +663,152 @@
         v.z * SCALE,   // z -> y (north becomes up)
         -v.y * SCALE   // y -> -z (90E becomes -forward)
       );
+    }
+
+    // ✅ Added: Horizons helpers (Pages Functions endpoints: /api/lookup and /api/vectors)
+    function nowIsoUTC(){
+      return new Date().toISOString().slice(0,19);
+    }
+    function addHoursIsoUTC(h){
+      return new Date(Date.now() + h*3600*1000).toISOString().slice(0,19);
+    }
+    function toJulianForHorizons(date){
+      return date.getTime()/86400000 + 2440587.5;
+    }
+    function lerp(a,b,t){ return a + (b-a)*t; }
+
+    function parseHorizonsCsvVectors(text){
+      // Extract $$SOE .. $$EOE block, parse CSV rows: JD, X, Y, Z, VX, VY, VZ
+      const start = text.indexOf("$$SOE");
+      const end   = text.indexOf("$$EOE");
+      if (start === -1 || end === -1 || end <= start) return [];
+
+      const block = text.slice(start + 5, end).trim();
+      const lines = block.split(/\r?\n/).map(l => l.trim()).filter(Boolean);
+
+      const out = [];
+      for (const line of lines){
+        const parts = line.split(",").map(s => s.trim());
+        if (parts.length < 7) continue;
+
+        const jd = Number(parts[0]);
+        const x  = Number(parts[1]);
+        const y  = Number(parts[2]);
+        const z  = Number(parts[3]);
+        const vx = Number(parts[4]);
+        const vy = Number(parts[5]);
+        const vz = Number(parts[6]);
+
+        if (![jd,x,y,z,vx,vy,vz].every(n => Number.isFinite(n))) continue;
+        out.push({ jd, x_km:x, y_km:y, z_km:z, vx_kms:vx, vy_kms:vy, vz_kms:vz });
+      }
+      return out;
+    }
+
+    function sampleVectorsAt(rows, jdNow){
+      if (!rows || rows.length < 2) return null;
+
+      let i = 0;
+      while (i < rows.length-2 && rows[i+1].jd < jdNow) i++;
+
+      const a = rows[i];
+      const b = rows[i+1];
+      const dt = (b.jd - a.jd);
+      if (!(dt > 0)) return null;
+
+      const t = (jdNow - a.jd) / dt;
+
+      return {
+        x_km: lerp(a.x_km, b.x_km, t),
+        y_km: lerp(a.y_km, b.y_km, t),
+        z_km: lerp(a.z_km, b.z_km, t),
+        vx_kms: lerp(a.vx_kms, b.vx_kms, t),
+        vy_kms: lerp(a.vy_kms, b.vy_kms, t),
+        vz_kms: lerp(a.vz_kms, b.vz_kms, t),
+      };
+    }
+
+    async function horizonsLookupBest(name){
+      const res = await fetch(`/api/lookup?s=${encodeURIComponent(name)}`);
+      if (!res.ok) throw new Error("Lookup HTTP " + res.status);
+      const data = await res.json();
+      const results = data?.result || [];
+      if (!results.length) return null;
+
+      // Prefer entries that have spkid
+      const withSpk = results.find(r => r && r.spkid) || results[0];
+      return withSpk?.spkid ? withSpk : null;
+    }
+
+    async function horizonsVectorsRows(command, center, startIso, stopIso, stepMin){
+      const url =
+        `/api/vectors?command=${encodeURIComponent(command)}&center=${encodeURIComponent(center)}&start=${encodeURIComponent(startIso)}&stop=${encodeURIComponent(stopIso)}&stepMin=${encodeURIComponent(String(stepMin))}`;
+
+      const res = await fetch(url);
+      if (!res.ok) throw new Error("Vectors HTTP " + res.status);
+
+      const raw = await res.json();
+      const text = raw?.result || "";
+      return parseHorizonsCsvVectors(text);
+    }
+
+    async function loadBodyHorizons(body){
+      if (horizonsLoadPromise) return horizonsLoadPromise;
+
+      horizonsLoadPromise = (async () => {
+        const center = BODY_CENTER[body];
+        const names = BODY_CRAFT_NAMES[body] || [];
+
+        clearAll();
+        setSelectedName("—");
+        selected = null;
+        clearTrack();
+
+        if (!center || !names.length){
+          catalogNoteEl.textContent = "Catalog: " + body + " (not wired)";
+          setStatus("READY");
+          launchOut.value =
+            "Selected body: " + body +
+            "\n\nNo Horizons spacecraft list configured for this body.\n";
+          return;
+        }
+
+        setStatus("LOADING CATALOG…");
+        catalogNoteEl.textContent = "Catalog: " + body + " / Horizons (loading…)";
+
+        const start = nowIsoUTC();
+        const stop  = addHoursIsoUTC(12); // 12h ahead
+        const stepMin = 2;                // 2-minute samples
+
+        const lookedUp = [];
+        for (const n of names){
+          const r = await horizonsLookupBest(n);
+          if (r?.spkid){
+            lookedUp.push({ displayName: (r.name || n), spkid: r.spkid });
+          }
+        }
+
+        const craft = [];
+        for (const obj of lookedUp){
+          const rows = await horizonsVectorsRows(obj.spkid, center, start, stop, stepMin);
+          craft.push({
+            name: obj.displayName,
+            norad: String(obj.spkid),  // reuse existing UI field
+            rows,
+            meshIndex: -1
+          });
+        }
+
+        sats = craft;
+        buildSatInstancedMesh(sats.length);
+        updateSatCount(sats.length);
+        catalogNoteEl.textContent = `Catalog: ${body} / Horizons (${sats.length} objects)`;
+        setStatus("READY");
+        renderSatList();
+      })();
+
+      horizonsLoadPromise.finally(() => { horizonsLoadPromise = null; });
+      return horizonsLoadPromise;
     }
 
     function parseTleText(text){
@@ -698,15 +870,15 @@
       const q = (searchEl.value || "").trim().toLowerCase();
       const matches = [];
       for (const s of sats){
-        if (!q || s.name.toLowerCase().includes(q) || s.norad.includes(q)) matches.push(s);
+        if (!q || s.name.toLowerCase().includes(q) || String(s.norad).includes(q)) matches.push(s);
         if (matches.length >= 80) break;
       }
       satListEl.innerHTML = "";
       for (const s of matches){
         const row = document.createElement("div");
         row.className = "satItem";
-        row.innerHTML = `<div class="satName">${escapeHtml(s.name)} <span style="color:rgba(159,179,217,.8);font-weight:700">(${s.norad})</span></div><div class="pill">TRACK</div>`;
-        row.addEventListener("click", () => selectSatByNorad(s.norad));
+        row.innerHTML = `<div class="satName">${escapeHtml(s.name)} <span style="color:rgba(159,179,217,.8);font-weight:700">(${escapeHtml(String(s.norad))})</span></div><div class="pill">TRACK</div>`;
+        row.addEventListener("click", () => selectSatByNorad(String(s.norad)));
         satListEl.appendChild(row);
       }
     }
@@ -718,7 +890,7 @@
     }
 
     function selectSatByNorad(norad){
-      const s = sats.find(x => x.norad === norad) || null;
+      const s = sats.find(x => String(x.norad) === String(norad)) || null;
       selected = s;
       setSelectedName(s ? s.name : "—");
 
@@ -731,7 +903,9 @@
       }
 
       clearTrack();
-      if (s && satellite) buildSelectedTrack(s, 90, 2);
+
+      // Earth TLE track only
+      if (s && s.satrec && satellite) buildSelectedTrack(s, 90, 2);
     }
 
     function buildSelectedTrack(sat, minutesAhead=90, stepMin=2){
@@ -753,37 +927,89 @@
     }
 
     function updateSatPositions(){
-      if (!satellite || !satMesh || !sats.length) return;
-      const t = new Date();
-      const gmst = satellite.gstime(t);
+      if (!satMesh || !sats.length) return;
 
+      // ---- Earth TLE path (unchanged behavior) ----
+      if (satellite && sats[0]?.satrec){
+        const t = new Date();
+        const gmst = satellite.gstime(t);
+
+        const mat4 = new THREE.Matrix4();
+        for (let i=0;i<sats.length;i++){
+          const s = sats[i];
+          const pv = satellite.propagate(s.satrec, t);
+          if (!pv.position){
+            mat4.makeTranslation(99999,99999,99999);
+            satMesh.setMatrixAt(i, mat4);
+            continue;
+          }
+          const ecef = satellite.eciToEcf(pv.position, gmst);
+          const p = ecefKmToScene(ecef);
+          mat4.makeTranslation(p.x, p.y, p.z);
+          satMesh.setMatrixAt(i, mat4);
+        }
+        satMesh.instanceMatrix.needsUpdate = true;
+
+        if (selected){
+          const pv = satellite.propagate(selected.satrec, t);
+          if (pv.position && pv.velocity){
+            const geo = satellite.eciToGeodetic(pv.position, gmst);
+            infoLat.textContent = satellite.degreesLat(geo.latitude).toFixed(2);
+            infoLon.textContent = satellite.degreesLong(geo.longitude).toFixed(2);
+            infoAlt.textContent = geo.height.toFixed(1);
+            const v = pv.velocity;
+            const spd = Math.sqrt(v.x*v.x + v.y*v.y + v.z*v.z);
+            infoSpd.textContent = spd.toFixed(3);
+            infoUtc.textContent = t.toISOString().replace("T"," ").slice(0,19) + "Z";
+          }
+        } else {
+          infoLat.textContent = infoLon.textContent = infoAlt.textContent = infoSpd.textContent = infoUtc.textContent = "—";
+        }
+
+        return;
+      }
+
+      // ---- Horizons path (Moon/Mars/Jupiter spacecraft) ----
+      const jdNow = toJulianForHorizons(new Date());
       const mat4 = new THREE.Matrix4();
+
       for (let i=0;i<sats.length;i++){
         const s = sats[i];
-        const pv = satellite.propagate(s.satrec, t);
-        if (!pv.position){
+        const st = sampleVectorsAt(s.rows, jdNow);
+        if (!st){
           mat4.makeTranslation(99999,99999,99999);
           satMesh.setMatrixAt(i, mat4);
           continue;
         }
-        const ecef = satellite.eciToEcf(pv.position, gmst);
-        const p = ecefKmToScene(ecef);
-        mat4.makeTranslation(p.x, p.y, p.z);
+
+        // Map Horizons body-centered XYZ into scene axes (same axis convention as your ECEF mapper)
+        const x = st.x_km * currentScale;
+        const y = st.z_km * currentScale;
+        const z = -st.y_km * currentScale;
+
+        mat4.makeTranslation(x, y, z);
         satMesh.setMatrixAt(i, mat4);
       }
+
       satMesh.instanceMatrix.needsUpdate = true;
 
       if (selected){
-        const pv = satellite.propagate(selected.satrec, t);
-        if (pv.position && pv.velocity){
-          const geo = satellite.eciToGeodetic(pv.position, gmst);
-          infoLat.textContent = satellite.degreesLat(geo.latitude).toFixed(2);
-          infoLon.textContent = satellite.degreesLong(geo.longitude).toFixed(2);
-          infoAlt.textContent = geo.height.toFixed(1);
-          const v = pv.velocity;
-          const spd = Math.sqrt(v.x*v.x + v.y*v.y + v.z*v.z);
+        const st = sampleVectorsAt(selected.rows, jdNow);
+        if (st){
+          // Approx lat/lon/alt from body-centered Cartesian (NOTE: inertial vs body-fixed differs; this is a useful first-pass)
+          const r = Math.sqrt(st.x_km*st.x_km + st.y_km*st.y_km + st.z_km*st.z_km);
+          const lat = Math.asin(st.z_km / r) * 180/Math.PI;
+          const lon = Math.atan2(st.y_km, st.x_km) * 180/Math.PI;
+          const bodyR = BODY_RADIUS_KM[currentBody] || EARTH_KM;
+          const alt = r - bodyR;
+
+          const spd = Math.sqrt(st.vx_kms*st.vx_kms + st.vy_kms*st.vy_kms + st.vz_kms*st.vz_kms);
+
+          infoLat.textContent = lat.toFixed(2);
+          infoLon.textContent = lon.toFixed(2);
+          infoAlt.textContent = alt.toFixed(1);
           infoSpd.textContent = spd.toFixed(3);
-          infoUtc.textContent = t.toISOString().replace("T"," ").slice(0,19) + "Z";
+          infoUtc.textContent = new Date().toISOString().replace("T"," ").slice(0,19) + "Z";
         }
       } else {
         infoLat.textContent = infoLon.textContent = infoAlt.textContent = infoSpd.textContent = infoUtc.textContent = "—";
@@ -862,6 +1088,10 @@
     function onBodyChange(){
       const body = bodySelectEl.value;
 
+      // ✅ Added: update current body + current scale for Horizons rendering
+      currentBody = body;
+      currentScale = R / (BODY_RADIUS_KM[currentBody] || EARTH_KM);
+
       // 🔹 Always switch the planet material
       switchBodyMaterial(body);
 
@@ -877,12 +1107,12 @@
         return;
       }
 
-      clearAll();
-      setStatus("READY");
-      catalogNoteEl.textContent = "Catalog: " + body + " (not wired)";
-      launchOut.value =
-        "Selected body: " + body +
-        "\n\nNo public satellite catalog wired for this body yet.\n";
+      // ✅ Added: Horizons path for non-Earth bodies
+      loadBodyHorizons(body).catch(e => {
+        setStatus("ERROR");
+        console.error(e);
+        alert(String(e));
+      });
     }
 
     function computeLaunchOverview(){
@@ -1003,7 +1233,7 @@
       // ---- congestion index (uses your loaded sats) ----
       // Count sats near inclination +/-2deg and current altitude +/-50km
       let congestionText = "Congestion: (sat catalog not loaded)";
-      if (satellite && sats && sats.length){
+      if (satellite && sats && sats.length && sats[0]?.satrec){
         const now = new Date();
         const gmst = satellite.gstime(now);
         const incTol = 2.0;
@@ -1111,7 +1341,7 @@
         updateSatPositions();
         lastPosUpdateMs = nowMs;
 
-        if (satellite && selected && trackLine && (nowMs - (trackLine.userData.last || 0) > 10000)){
+        if (satellite && selected && trackLine && selected?.satrec && (nowMs - (trackLine.userData.last || 0) > 10000)){
           clearTrack();
           buildSelectedTrack(selected, 90, 2);
         }
@@ -1134,4 +1364,3 @@
 </script>
 </body>
 </html>
-
