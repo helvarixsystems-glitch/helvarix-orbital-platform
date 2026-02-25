@@ -486,33 +486,43 @@ function downloadText(filename, text){
       starGeo.setAttribute("position", new THREE.BufferAttribute(starPos, 3));
       scene.add(new THREE.Points(starGeo, new THREE.PointsMaterial({ color: 0xffffff, size: 2, sizeAttenuation: true })));
 
-      // Earth
-      const R = 100;
-      const EARTH_KM = 6371;
-      const SCALE = R / EARTH_KM;
+    // ---------- Earth / Planet Mesh ----------
 
-      const earthGroup = new THREE.Group();
-      scene.add(earthGroup);
+const R = 100;
+const EARTH_KM = 6371;
+const SCALE = R / EARTH_KM;
 
-      const earthGeom = new THREE.SphereGeometry(R, 96, 96);
+const earthGroup = new THREE.Group();
+scene.add(earthGroup);
+
+const earthGeom = new THREE.SphereGeometry(R, 96, 96);
+
+// ✅ One shared planet mesh for all bodies
 let planetMesh = new THREE.Mesh(
   earthGeom,
-  new THREE.MeshStandardMaterial({ color: 0x223355, roughness: 1.0 })
+  new THREE.MeshStandardMaterial({
+    color: 0x223355,
+    roughness: 1.0
+  })
 );
+
 earthGroup.add(planetMesh);
+
+// Atmosphere
+function buildAtmosphere(){
+  const atmoGeom = new THREE.SphereGeometry(R * 1.02, 96, 96);
+  const atmoMat  = new THREE.MeshBasicMaterial({
+    color: 0x00E6FF,
+    transparent: true,
+    opacity: 0.05
+  });
+  earthGroup.add(new THREE.Mesh(atmoGeom, atmoMat));
+}
+
 buildAtmosphere();
-earthBuilt = true;
-      
-      function buildAtmosphere(){
-        const atmoGeom = new THREE.SphereGeometry(R * 1.02, 96, 96);
-        const atmoMat  = new THREE.MeshBasicMaterial({ color: 0x00E6FF, transparent:true, opacity:0.05 });
-        earthGroup.add(new THREE.Mesh(atmoGeom, atmoMat));
-      }
 
-      let earthBuilt = false;
-      function buildFallbackEarth(){
-  if (!planetMesh) return;
-
+// Fallback material if textures fail
+function buildFallbackEarth(){
   planetMesh.material = new THREE.MeshStandardMaterial({
     color: 0x0B1530,
     roughness: 0.85,
@@ -520,17 +530,8 @@ earthBuilt = true;
     emissive: new THREE.Color(0x08122A),
     emissiveIntensity: 1.25
   });
-
   planetMesh.material.needsUpdate = true;
 }
-       planetMesh = new THREE.Mesh(
-  earthGeom,
-  new THREE.MeshStandardMaterial({ color: 0x223355, roughness: 1.0 })
-);
-
-earthGroup.add(planetMesh);
-buildAtmosphere();
-      }
 
       const texLoader = new THREE.TextureLoader();
 texLoader.setCrossOrigin("anonymous");
@@ -1138,6 +1139,7 @@ onBodyChange();
   </script>
 </body>
 </html>
+
 
 
 
