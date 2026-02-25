@@ -443,7 +443,6 @@ function downloadText(filename, text){
 
       // satellite is optional (globe should still render)
       // satellite is imported; if this runs, it loaded.
-console.log("satellite.js loaded", !!satellite);
 
       // ---------- Wire presets ----------
       if (presetEl) {
@@ -511,7 +510,7 @@ console.log("satellite.js loaded", !!satellite);
           color: 0x0B1530, roughness:0.85, metalness:0.10,
           emissive: new THREE.Color(0x08122A), emissiveIntensity:1.25
         });
-        const planetMesh = new THREE.Mesh(
+       planetMesh = new THREE.Mesh(
   earthGeom,
   new THREE.MeshStandardMaterial({ color: 0x223355, roughness: 1.0 })
 );
@@ -527,21 +526,21 @@ texLoader.setCrossOrigin("anonymous");
 const BODY_URLS = {
 
   earth: {
-    map:  "https://cdn.apewebapps.com/threejs/160/examples/textures/planets/earth_atmos_2048.jpg",
-    normal: "https://cdn.apewebapps.com/threejs/160/examples/textures/planets/earth_normal_2048.jpg",
-    spec: "https://cdn.apewebapps.com/threejs/160/examples/textures/planets/earth_specular_2048.jpg"
+    map:  "https://threejs.org/examples/textures/planets/earth_atmos_2048.jpg",
+    normal: "https://threejs.org/examples/textures/planets/earth_normal_2048.jpg",
+    spec: "https://threejs.org/examples/textures/planets/earth_specular_2048.jpg"
   },
 
   moon: {
-    map: "https://cdn.apewebapps.com/threejs/160/examples/textures/planets/moon_1024.jpg"
+    map: "https://threejs.org/examples/textures/planets/moon_1024.jpg"
   },
 
   mars: {
-    map: "https://cdn.apewebapps.com/threejs/160/examples/textures/planets/mars_1024.jpg"
+    map: "https://threejs.org/examples/textures/planets/mars_1024.jpg"
   },
 
   jupiter: {
-    map: "https://cdn.apewebapps.com/threejs/160/examples/textures/planets/jupiter2_1024.jpg"
+    map: "https://threejs.org/examples/textures/planets/jupiter2_1024.jpg"
   }
 
 };
@@ -595,6 +594,7 @@ function switchBodyMaterial(bodyKey){
 let selected = null;
 let earthLoadPromise = null; 
       let satMesh = null;
+      let planetMesh = null;
       let trackLine = null;
       let lastPosUpdateMs = 0;
 
@@ -1073,6 +1073,7 @@ searchEl.addEventListener("input", renderSatList);
 bodySelectEl.addEventListener("change", onBodyChange);
 
 // Load initial body
+if (!planetMesh) buildFallbackEarth();
 switchBodyMaterial(bodySelectEl.value);
 onBodyChange();
 
@@ -1106,6 +1107,7 @@ onBodyChange();
   </script>
 </body>
 </html>
+
 
 
 
