@@ -342,18 +342,18 @@
     <div class="panel planet">
       <div class="panelHeader">
         <div class="title">BODY SELECT</div>
-        <div class="subtitle">Pick a planet/moon catalog. Earth is wired to public “active” TLEs. Others are framework placeholders.</div>
+        <div class="subtitle">Pick a planet/moon catalog. Earth is wired to public “active” TLEs. Others use Horizons spacecraft ephemerides.</div>
       </div>
       <div class="panelBody">
         <label>Celestial body</label>
         <select id="bodySelect">
           <option value="earth">Earth (Active satellites)</option>
-          <option value="moon">Moon (framework)</option>
-          <option value="mars">Mars (framework)</option>
-          <option value="jupiter">Jupiter (framework)</option>
+          <option value="moon">Moon (Horizons)</option>
+          <option value="mars">Mars (Horizons)</option>
+          <option value="jupiter">Jupiter (Horizons)</option>
         </select>
         <div class="note" id="bodyNote">
-          Earth loads from a public TLE catalog. For other bodies, you’ll need a public orbital element feed (mission catalogs differ by agency).
+          Earth loads from a public TLE catalog. Moon/Mars/Jupiter load from Horizons (spacecraft ephemeris per-object).
         </div>
       </div>
     </div>
@@ -375,7 +375,6 @@
 }
 </script>
 
-<!-- Three.js + OrbitControls as ES modules -->
 <script type="module">
   import * as THREE from "three";
   import { OrbitControls } from "https://cdn.jsdelivr.net/npm/three@0.148.0/examples/jsm/controls/OrbitControls.js";
@@ -490,7 +489,7 @@
     const EARTH_KM = 6371;
     const SCALE = R / EARTH_KM; // Earth scale (kept for TLE/ECEF path)
 
-    // ✅ Added: body radii + current body scale for Horizons bodies
+    // body radii + current scale for Horizons bodies
     const BODY_RADIUS_KM = {
       earth: 6371,
       moon: 1737.4,
@@ -500,16 +499,62 @@
     let currentBody = "earth";
     let currentScale = R / (BODY_RADIUS_KM[currentBody] || EARTH_KM);
 
-    // ✅ Added: Horizons center codes + initial craft lists
+    // Horizons center codes (SSB@BODY)
     const BODY_CENTER = {
       moon: "500@301",
       mars: "500@499",
       jupiter: "500@599"
     };
-    const BODY_CRAFT_NAMES = {
-      moon: ["LRO", "CAPSTONE"],
-      mars: ["MRO", "MAVEN", "Mars Odyssey"],
-      jupiter: ["Juno"]
+
+    // “Exhaustive” practical catalogs (best-effort via name lookup).
+    // If you want true reliability, swap to { spkid: "..." } once you confirm IDs.
+    const BODY_CRAFT = {
+      moon: [
+        { query: "LRO", name: "LRO" },
+        { query: "CAPSTONE", name: "CAPSTONE" },
+        { query: "KPLO", name: "KPLO (DANURI)" },
+        { query: "DANURI", name: "DANURI (KPLO)" },
+        { query: "Chandrayaan-2", name: "Chandrayaan-2 Orbiter" },
+        { query: "SMART-1", name: "SMART-1 (historic)" },
+        { query: "KAGUYA", name: "Kaguya / SELENE (historic)" },
+        { query: "LADEE", name: "LADEE (historic)" },
+        { query: "GRAIL-A", name: "GRAIL-A (historic)" },
+        { query: "GRAIL-B", name: "GRAIL-B (historic)" }
+      ],
+      mars: [
+        // Current/Recent orbiters
+        { query: "MRO", name: "Mars Reconnaissance Orbiter (MRO)" },
+        { query: "MAVEN", name: "MAVEN" },
+        { query: "Mars Odyssey", name: "Mars Odyssey" },
+        { query: "Mars Express", name: "Mars Express" },
+        { query: "EXOMARS TRACE GAS ORBITER", name: "ExoMars TGO" },
+        { query: "Trace Gas Orbiter", name: "Trace Gas Orbiter (TGO)" },
+        { query: "Tianwen-1", name: "Tianwen-1 Orbiter" },
+        { query: "HOPE", name: "Hope / EMM (UAE)" },
+        { query: "EMM", name: "EMM / Hope (UAE)" },
+        // Historic orbiters (may still resolve in Horizons)
+        { query: "MARS GLOBAL SURVEYOR", name: "Mars Global Surveyor (historic)" },
+        { query: "MARS CLIMATE ORBITER", name: "Mars Climate Orbiter (historic)" },
+        { query: "MARS POLAR LANDER", name: "Mars Polar Lander (historic)" },
+        { query: "PHOBOS 2", name: "Phobos 2 (historic)" },
+        { query: "PHOBOS 1", name: "Phobos 1 (historic)" },
+        { query: "MARS ORBITER MISSION", name: "Mars Orbiter Mission / MOM (historic)" },
+        { query: "MANGALYAAN", name: "Mangalyaan / MOM (historic)" }
+      ],
+      jupiter: [
+        // True Jupiter orbiter today
+        { query: "JUNO", name: "Juno" },
+        // Historic Jupiter orbiter (worked at Jupiter)
+        { query: "GALILEO ORBITER", name: "Galileo Orbiter (historic)" },
+        // Not orbiters, but sometimes useful to display if Horizons resolves them
+        { query: "VOYAGER 1", name: "Voyager 1 (flyby)" },
+        { query: "VOYAGER 2", name: "Voyager 2 (flyby)" },
+        { query: "PIONEER 10", name: "Pioneer 10 (flyby)" },
+        { query: "PIONEER 11", name: "Pioneer 11 (flyby)" },
+        { query: "ULYSSES", name: "Ulysses (flyby)" },
+        { query: "CASSINI", name: "Cassini (flyby)" },
+        { query: "NEW HORIZONS", name: "New Horizons (flyby)" }
+      ]
     };
 
     const earthGroup = new THREE.Group();
@@ -517,7 +562,7 @@
 
     const earthGeom = new THREE.SphereGeometry(R, 96, 96);
 
-    // ✅ One shared planet mesh for all bodies
+    // One shared planet mesh for all bodies
     let planetMesh = new THREE.Mesh(
       earthGeom,
       new THREE.MeshStandardMaterial({
@@ -538,7 +583,6 @@
       });
       earthGroup.add(new THREE.Mesh(atmoGeom, atmoMat));
     }
-
     buildAtmosphere();
 
     // Fallback material if textures fail
@@ -556,28 +600,23 @@
     const texLoader = new THREE.TextureLoader();
     texLoader.setCrossOrigin("anonymous");
 
-    // 🔹 Body texture catalog
     const BODY_URLS = {
       earth: {
         map:  "https://cdn.jsdelivr.net/gh/mrdoob/three.js@r148/examples/textures/planets/earth_atmos_2048.jpg",
         normal: "https://cdn.jsdelivr.net/gh/mrdoob/three.js@r148/examples/textures/planets/earth_normal_2048.jpg",
         spec: "https://cdn.jsdelivr.net/gh/mrdoob/three.js@r148/examples/textures/planets/earth_specular_2048.jpg"
       },
-
       moon: {
         map: "https://cdn.jsdelivr.net/gh/mrdoob/three.js@r148/examples/textures/planets/moon_1024.jpg"
       },
-
       mars: {
         map: "https://upload.wikimedia.org/wikipedia/commons/4/46/Solarsystemscope_texture_2k_mars.jpg"
       },
-
       jupiter: {
         map: "https://upload.wikimedia.org/wikipedia/commons/5/5e/Solarsystemscope_texture_8k_jupiter.jpg"
       }
     };
 
-    /* ✅ FIX 1: define earthBuilt + fix switchBodyMaterial braces */
     let earthBuilt = false;
     setTimeout(() => { if (!earthBuilt) buildFallbackEarth(); }, 6000);
 
@@ -592,7 +631,6 @@
         (map) => {
           map.colorSpace = THREE.SRGBColorSpace;
 
-          // Earth uses map + normal + spec
           if (bodyKey === "earth" && cfg.normal && cfg.spec){
             texLoader.load(
               cfg.normal,
@@ -619,7 +657,6 @@
               () => { buildFallbackEarth(); setStatus("READY"); }
             );
           } else {
-            // Other bodies just use a basic map material
             planetMesh.material = new THREE.MeshStandardMaterial({
               map,
               roughness: bodyKey === "jupiter" ? 0.95 : 1.0,
@@ -644,11 +681,9 @@
     let selected = null;
     let earthLoadPromise = null;
     let satMesh = null;
-    /* ✅ FIX 2: removed the redeclaration "let planetMesh = null;" */
     let trackLine = null;
     let lastPosUpdateMs = 0;
 
-    // ✅ Added: Horizons cache for current body (so it doesn't refetch constantly)
     let horizonsLoadPromise = null;
 
     const SAT_POINT_RADIUS = 0.6;
@@ -656,29 +691,20 @@
     const SAT_COLOR_SELECTED = new THREE.Color(0xFFCC33);
 
     function ecefKmToScene(v){
-      // ECEF: x=Greenwich, y=90E, z=North
-      // Three.js: y=Up (North), x=Right, z=Forward
       return new THREE.Vector3(
-        v.x * SCALE,   // x stays x
-        v.z * SCALE,   // z -> y (north becomes up)
-        -v.y * SCALE   // y -> -z (90E becomes -forward)
+        v.x * SCALE,
+        v.z * SCALE,
+        -v.y * SCALE
       );
     }
 
-    // ✅ Added: Horizons helpers (Pages Functions endpoints: /api/lookup and /api/vectors)
-    function nowIsoUTC(){
-      return new Date().toISOString().slice(0,19);
-    }
-    function addHoursIsoUTC(h){
-      return new Date(Date.now() + h*3600*1000).toISOString().slice(0,19);
-    }
-    function toJulianForHorizons(date){
-      return date.getTime()/86400000 + 2440587.5;
-    }
+    // ---------- Horizons helpers ----------
+    function nowIsoUTC(){ return new Date().toISOString().slice(0,19); }
+    function addHoursIsoUTC(h){ return new Date(Date.now() + h*3600*1000).toISOString().slice(0,19); }
+    function toJulianForHorizons(date){ return date.getTime()/86400000 + 2440587.5; }
     function lerp(a,b,t){ return a + (b-a)*t; }
 
     function parseHorizonsCsvVectors(text){
-      // Extract $$SOE .. $$EOE block, parse CSV rows: JD, X, Y, Z, VX, VY, VZ
       const start = text.indexOf("$$SOE");
       const end   = text.indexOf("$$EOE");
       if (start === -1 || end === -1 || end <= start) return [];
@@ -717,7 +743,6 @@
       if (!(dt > 0)) return null;
 
       const t = (jdNow - a.jd) / dt;
-
       return {
         x_km: lerp(a.x_km, b.x_km, t),
         y_km: lerp(a.y_km, b.y_km, t),
@@ -735,7 +760,6 @@
       const results = data?.result || [];
       if (!results.length) return null;
 
-      // Prefer entries that have spkid
       const withSpk = results.find(r => r && r.spkid) || results[0];
       return withSpk?.spkid ? withSpk : null;
     }
@@ -752,19 +776,75 @@
       return parseHorizonsCsvVectors(text);
     }
 
+    function clearTrack(){
+      if (trackLine){
+        scene.remove(trackLine);
+        trackLine.geometry.dispose();
+        trackLine.material.dispose();
+        trackLine = null;
+      }
+    }
+
+    function buildHorizonsTrack(obj, minutesAhead = 360, stepMin = 5){
+      if (!obj?.rows?.length) return;
+
+      const pts = [];
+      const now = new Date();
+      const jd0 = toJulianForHorizons(now);
+
+      for (let m = 0; m <= minutesAhead; m += stepMin){
+        const jd = jd0 + (m / 1440);
+        const st = sampleVectorsAt(obj.rows, jd);
+        if (!st) continue;
+
+        const x = st.x_km * currentScale;
+        const y = st.z_km * currentScale;
+        const z = -st.y_km * currentScale;
+
+        pts.push(new THREE.Vector3(x, y, z));
+      }
+
+      if (pts.length < 2) return;
+
+      const geo = new THREE.BufferGeometry().setFromPoints(pts);
+      const mat = new THREE.LineBasicMaterial({ color: 0xFFCC33, transparent:true, opacity:0.85 });
+      trackLine = new THREE.Line(geo, mat);
+      trackLine.userData.last = performance.now();
+      scene.add(trackLine);
+    }
+
+    // tiny concurrency limiter for Horizons loads
+    async function mapLimit(arr, limit, fn){
+      const results = new Array(arr.length);
+      let idx = 0;
+
+      async function worker(){
+        while (idx < arr.length){
+          const i = idx++;
+          try { results[i] = await fn(arr[i], i); }
+          catch (e) { results[i] = { __error: e }; }
+        }
+      }
+
+      const workers = [];
+      for (let k=0; k<Math.max(1, limit); k++) workers.push(worker());
+      await Promise.all(workers);
+      return results;
+    }
+
     async function loadBodyHorizons(body){
       if (horizonsLoadPromise) return horizonsLoadPromise;
 
       horizonsLoadPromise = (async () => {
         const center = BODY_CENTER[body];
-        const names = BODY_CRAFT_NAMES[body] || [];
+        const craftList = BODY_CRAFT[body] || [];
 
         clearAll();
         setSelectedName("—");
         selected = null;
         clearTrack();
 
-        if (!center || !names.length){
+        if (!center || !craftList.length){
           catalogNoteEl.textContent = "Catalog: " + body + " (not wired)";
           setStatus("READY");
           launchOut.value =
@@ -780,37 +860,45 @@
         const stop  = addHoursIsoUTC(12); // 12h ahead
         const stepMin = 2;                // 2-minute samples
 
-        const lookedUp = [];
-        for (const n of names){
-          const r = await horizonsLookupBest(n);
-          if (r?.spkid){
-            lookedUp.push({ displayName: (r.name || n), spkid: r.spkid });
-          }
-        }
+        // Lookup SPKIDs (prefer provided spkid)
+        const lookedUp = await mapLimit(craftList, 4, async (c) => {
+          if (c?.spkid) return { displayName: (c.name || c.query || String(c.spkid)), spkid: String(c.spkid) };
+          const r = await horizonsLookupBest(c.query || c.name);
+          if (!r?.spkid) return null;
+          return { displayName: (c.name || r.name || c.query), spkid: String(r.spkid) };
+        });
 
-        const craft = [];
-        for (const obj of lookedUp){
+        const resolved = lookedUp.filter(Boolean);
+
+        // Fetch vectors
+        const craft = await mapLimit(resolved, 3, async (obj) => {
           const rows = await horizonsVectorsRows(obj.spkid, center, start, stop, stepMin);
-          craft.push({
-            name: obj.displayName,
-            norad: String(obj.spkid),  // reuse existing UI field
-            rows,
-            meshIndex: -1
-          });
-        }
+          if (!rows || rows.length < 2) return null;
+          return { name: obj.displayName, norad: obj.spkid, rows, meshIndex: -1 };
+        });
 
-        sats = craft;
+        sats = craft.filter(Boolean);
+
         buildSatInstancedMesh(sats.length);
         updateSatCount(sats.length);
         catalogNoteEl.textContent = `Catalog: ${body} / Horizons (${sats.length} objects)`;
         setStatus("READY");
         renderSatList();
+
+        if (!sats.length){
+          launchOut.value =
+            `Selected body: ${body}\n\n` +
+            "Horizons returned 0 usable objects from the current list.\n" +
+            "This usually means the lookup names didn’t resolve.\n" +
+            "Fix by switching entries to explicit {spkid:\"...\"} once confirmed.\n";
+        }
       })();
 
       horizonsLoadPromise.finally(() => { horizonsLoadPromise = null; });
       return horizonsLoadPromise;
     }
 
+    // ---------- TLE parsing ----------
     function parseTleText(text){
       const lines = text.split(/\r?\n/).map(l=>l.trim()).filter(Boolean);
       const out = [];
@@ -831,15 +919,6 @@
       return s.replace(/[&<>"']/g, (c) => ({'&':'&amp;','<':'&lt;','>':'&gt;','"':'&quot;',"'":'&#39;'}[c]));
     }
 
-    function clearTrack(){
-      if (trackLine){
-        scene.remove(trackLine);
-        trackLine.geometry.dispose();
-        trackLine.material.dispose();
-        trackLine = null;
-      }
-    }
-
     function buildSatInstancedMesh(n){
       if (satMesh){
         scene.remove(satMesh);
@@ -848,9 +927,9 @@
       }
       const geom = new THREE.SphereGeometry(SAT_POINT_RADIUS, 10, 10);
       const mat  = new THREE.MeshBasicMaterial({ color: 0xffffff });
-      satMesh = new THREE.InstancedMesh(geom, mat, n);
+      satMesh = new THREE.InstancedMesh(geom, mat, Math.max(1, n));
       satMesh.instanceMatrix.setUsage(THREE.DynamicDrawUsage);
-      satMesh.instanceColor = new THREE.InstancedBufferAttribute(new Float32Array(n*3), 3);
+      satMesh.instanceColor = new THREE.InstancedBufferAttribute(new Float32Array(Math.max(1, n)*3), 3);
       satMesh.instanceColor.setUsage(THREE.DynamicDrawUsage);
 
       const m = new THREE.Matrix4();
@@ -904,8 +983,14 @@
 
       clearTrack();
 
-      // Earth TLE track only
-      if (s && s.satrec && satellite) buildSelectedTrack(s, 90, 2);
+      // Earth TLE track
+      if (s && s.satrec && satellite) {
+        buildSelectedTrack(s, 90, 2);
+      }
+      // Horizons track (Moon/Mars/Jupiter)
+      else if (s && s.rows) {
+        buildHorizonsTrack(s, 360, 5);
+      }
     }
 
     function buildSelectedTrack(sat, minutesAhead=90, stepMin=2){
@@ -929,7 +1014,7 @@
     function updateSatPositions(){
       if (!satMesh || !sats.length) return;
 
-      // ---- Earth TLE path (unchanged behavior) ----
+      // Earth TLE path
       if (satellite && sats[0]?.satrec){
         const t = new Date();
         const gmst = satellite.gstime(t);
@@ -965,11 +1050,10 @@
         } else {
           infoLat.textContent = infoLon.textContent = infoAlt.textContent = infoSpd.textContent = infoUtc.textContent = "—";
         }
-
         return;
       }
 
-      // ---- Horizons path (Moon/Mars/Jupiter spacecraft) ----
+      // Horizons path
       const jdNow = toJulianForHorizons(new Date());
       const mat4 = new THREE.Matrix4();
 
@@ -982,7 +1066,6 @@
           continue;
         }
 
-        // Map Horizons body-centered XYZ into scene axes (same axis convention as your ECEF mapper)
         const x = st.x_km * currentScale;
         const y = st.z_km * currentScale;
         const z = -st.y_km * currentScale;
@@ -996,7 +1079,6 @@
       if (selected){
         const st = sampleVectorsAt(selected.rows, jdNow);
         if (st){
-          // Approx lat/lon/alt from body-centered Cartesian (NOTE: inertial vs body-fixed differs; this is a useful first-pass)
           const r = Math.sqrt(st.x_km*st.x_km + st.y_km*st.y_km + st.z_km*st.z_km);
           const lat = Math.asin(st.z_km / r) * 180/Math.PI;
           const lon = Math.atan2(st.y_km, st.x_km) * 180/Math.PI;
@@ -1017,7 +1099,6 @@
     }
 
     async function loadEarthActive(){
-      // ✅ reuse inflight load (prevents duplicates)
       if (earthLoadPromise) return earthLoadPromise;
 
       earthLoadPromise = (async () => {
@@ -1034,7 +1115,6 @@
 
         const url = "https://celestrak.org/NORAD/elements/gp.php?GROUP=active&FORMAT=tle";
 
-        // ✅ 20s timeout so it can’t hang forever
         const ctrl = new AbortController();
         const timer = setTimeout(() => ctrl.abort(), 20000);
 
@@ -1064,7 +1144,6 @@
       })();
 
       earthLoadPromise.finally(() => { earthLoadPromise = null; });
-
       return earthLoadPromise;
     }
 
@@ -1088,11 +1167,9 @@
     function onBodyChange(){
       const body = bodySelectEl.value;
 
-      // ✅ Added: update current body + current scale for Horizons rendering
       currentBody = body;
       currentScale = R / (BODY_RADIUS_KM[currentBody] || EARTH_KM);
 
-      // 🔹 Always switch the planet material
       switchBodyMaterial(body);
 
       if (body === "earth"){
@@ -1107,7 +1184,6 @@
         return;
       }
 
-      // ✅ Added: Horizons path for non-Earth bodies
       loadBodyHorizons(body).catch(e => {
         setStatus("ERROR");
         console.error(e);
@@ -1137,37 +1213,29 @@
         return date.getTime()/86400000 + 2440587.5;
       }
 
-      // Approx solar elevation (deg) at given lat/lon/time (good enough for day/twilight/night windows)
+      // Approx solar elevation (deg) at given lat/lon/time
       function solarElevationDeg(date, latDeg, lonDeg){
         const jd = toJulian(date);
         const n = jd - 2451545.0;
 
-        // Mean longitude & anomaly of the Sun (deg)
         const L = (280.460 + 0.9856474 * n) % 360;
         const g = rad((357.528 + 0.9856003 * n) % 360);
 
-        // Ecliptic longitude (deg)
         const lambda = rad((L + 1.915*Math.sin(g) + 0.020*Math.sin(2*g)) % 360);
 
-        // Obliquity (rad)
         const eps = rad(23.439 - 0.0000004 * n);
 
-        // RA/Dec
         const sinLambda = Math.sin(lambda), cosLambda = Math.cos(lambda);
         const sinEps = Math.sin(eps), cosEps = Math.cos(eps);
 
-        const alpha = Math.atan2(cosEps*sinLambda, cosLambda); // RA (rad)
-        const delta = Math.asin(sinEps*sinLambda);             // Dec (rad)
+        const alpha = Math.atan2(cosEps*sinLambda, cosLambda);
+        const delta = Math.asin(sinEps*sinLambda);
 
-        // Greenwich Mean Sidereal Time (deg)
         const T = (jd - 2451545.0)/36525.0;
         let GMST = 280.46061837 + 360.98564736629*(jd - 2451545.0) + 0.000387933*T*T - (T*T*T)/38710000.0;
         GMST = ((GMST % 360) + 360) % 360;
 
-        // Local sidereal time (rad)
         const LST = rad(((GMST + lonDeg) % 360 + 360) % 360);
-
-        // Hour angle (rad)
         const H = LST - alpha;
 
         const lat = rad(latDeg);
@@ -1198,9 +1266,6 @@
 
       const latAbs = Math.abs(site.lat);
 
-      // ---- reachability + azimuths ----
-      // For a due-east launch, inclination ~= latitude. General relationship:
-      // sin(Az_from_north) = cos(i)/cos(phi)  (prograde solution)
       let reachable = incDeg >= latAbs && incDeg <= (180 - latAbs);
       let azPrograde = null;
       let azRetrograde = null;
@@ -1209,29 +1274,25 @@
         const phi = rad(site.lat);
         const i = rad(incDeg);
         const ratio = clamp(Math.cos(i)/Math.cos(phi), -1, 1);
-        const Az = Math.asin(ratio);            // from North toward East (rad), range [-90, +90]
-        azPrograde = (deg(Az) + 360) % 360;     // 0..360
+        const Az = Math.asin(ratio);
+        azPrograde = (deg(Az) + 360) % 360;
         azRetrograde = (180 - azPrograde + 360) % 360;
       }
 
-      // ---- simple performance estimates ----
-      const MU = 398600.4418; // km^3/s^2
-      const r = EARTH_KM + altKm;         // km
-      const vOrb = Math.sqrt(MU / r);     // km/s circular orbit
-      const vRotEq = 0.465101;            // km/s at equator
-      const vRot = vRotEq * Math.cos(rad(site.lat)); // km/s at latitude
+      const MU = 398600.4418;
+      const r = EARTH_KM + altKm;
+      const vOrb = Math.sqrt(MU / r);
+      const vRotEq = 0.465101;
+      const vRot = vRotEq * Math.cos(rad(site.lat));
 
-      // Rotation assist along the launch direction ~ east-component
       let assistPro = null, assistRetro = null;
       if (reachable){
-        const eastComponentPro = Math.sin(rad(azPrograde));  // if Az is from North
-        assistPro = vRot * eastComponentPro;                 // km/s
+        const eastComponentPro = Math.sin(rad(azPrograde));
+        assistPro = vRot * eastComponentPro;
         const eastComponentRetro = Math.sin(rad(azRetrograde));
         assistRetro = vRot * eastComponentRetro;
       }
 
-      // ---- congestion index (uses your loaded sats) ----
-      // Count sats near inclination +/-2deg and current altitude +/-50km
       let congestionText = "Congestion: (sat catalog not loaded)";
       if (satellite && sats && sats.length && sats[0]?.satrec){
         const now = new Date();
@@ -1242,21 +1303,17 @@
         let inBand = 0;
         for (const s of sats){
           if (Math.abs((s.inclDeg ?? 0) - incDeg) > incTol) continue;
-
-          // Estimate current altitude from propagation
           const pv = satellite.propagate(s.satrec, now);
           if (!pv.position) continue;
           const geo = satellite.eciToGeodetic(pv.position, gmst);
-          const h = geo.height; // km
+          const h = geo.height;
           if (Math.abs(h - altKm) <= altTol) inBand++;
         }
 
-        // Normalize to something understandable (not “perfect science”, but useful signal)
         const pct = (inBand / sats.length) * 100;
         congestionText = `Congestion: ${inBand} sats within ±${incTol}° incl and ±${altTol} km alt (${pct.toFixed(2)}% of loaded catalog)`;
       }
 
-      // ---- build a 24h “window schedule” based on site lighting ----
       const start = new Date();
       const stepMin = 30;
       const steps = Math.floor((24 * 60) / stepMin);
@@ -1290,12 +1347,9 @@
 
       for (let k=0; k<=steps; k++){
         const t = new Date(start.getTime() + k*stepMin*60*1000);
-        const el = solarElevationDeg(t, site.lat, site.lon);
-        const cond = classifyLight(el);
+        const elv = solarElevationDeg(t, site.lat, site.lon);
+        const cond = classifyLight(elv);
 
-        // Simple “GO” heuristic (you can refine later):
-        // - If unreachable => all “NO”
-        // - If reachable => prefer NIGHT or TWILIGHT, allow DAY with caution
         let go = "NO";
         let note = "";
         if (reachable){
@@ -1306,7 +1360,7 @@
         }
 
         const ts = t.toISOString().replace("T"," ").slice(0,16) + "Z";
-        lines.push(`${ts}   ${el.toFixed(1).padStart(5)}°  ${cond.padEnd(18)}  ${go} ${note}`);
+        lines.push(`${ts}   ${elv.toFixed(1).padStart(5)}°  ${cond.padEnd(18)}  ${go} ${note}`);
       }
 
       launchOut.value = lines.join("\n");
@@ -1341,9 +1395,16 @@
         updateSatPositions();
         lastPosUpdateMs = nowMs;
 
+        // Refresh Earth track
         if (satellite && selected && trackLine && selected?.satrec && (nowMs - (trackLine.userData.last || 0) > 10000)){
           clearTrack();
           buildSelectedTrack(selected, 90, 2);
+        }
+
+        // Refresh Horizons track
+        if (selected && selected?.rows && trackLine && !selected?.satrec && (nowMs - (trackLine.userData.last || 0) > 10000)){
+          clearTrack();
+          buildHorizonsTrack(selected, 360, 5);
         }
       }
       controls.update();
@@ -1358,7 +1419,6 @@
       renderer.setSize(window.innerWidth, window.innerHeight);
     });
 
-    // If we got here, the globe WILL render.
     setStatus("READY");
   })();
 </script>
