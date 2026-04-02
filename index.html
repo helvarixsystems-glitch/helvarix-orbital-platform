@@ -367,16 +367,14 @@
   </div>
 
 <script>
-  window.HVRX_DEPENDENCIES = {
+  window.HVRX_DEPENDENCIES = window.HVRX_DEPENDENCIES || {
     satelliteReady: false,
     satelliteError: null
   };
 </script>
 <script
-  src="https://cdn.jsdelivr.net/npm/satellite.js@5.0.1/dist/satellite.min.js"
-  crossorigin="anonymous"
-  referrerpolicy="no-referrer"
-  onload="window.HVRX_DEPENDENCIES.satelliteReady = !!window.satellite; console.log('satellite.js loaded', !!window.satellite);"
+  src="https://unpkg.com/satellite.js@5.0.0/dist/satellite.min.js"
+  onload="window.HVRX_DEPENDENCIES.satelliteReady = !!window.satellite; console.log('satellite.js loaded', !!window.satellite, window.HVRX_DEPENDENCIES.satelliteError || '');"
   onerror="window.HVRX_DEPENDENCIES.satelliteReady = false; window.HVRX_DEPENDENCIES.satelliteError = 'CDN load failed'; console.error('satellite.js failed to load from CDN');"
 ></script>
 <script type="importmap">
@@ -1116,9 +1114,7 @@
       earthLoadPromise = (async () => {
         if (!satellite){
           setStatus("SAT DISABLED");
-          const reason = window.HVRX_DEPENDENCIES?.satelliteError || "satellite.js did not initialize";
-          console.error("satellite.js unavailable:", reason);
-          alert("satellite.js is not loaded, so Earth satellite tracking is disabled. Reason: " + reason);
+          alert("satellite.js is not loaded, so Earth satellite tracking is disabled. Reason: " + (window.HVRX_DEPENDENCIES?.satelliteError || "Unknown load error"));
           return;
         }
 
