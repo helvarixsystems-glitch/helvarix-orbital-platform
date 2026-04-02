@@ -1123,7 +1123,7 @@
         selected = null;
         clearTrack();
 
-        const url = "https://celestrak.org/NORAD/elements/gp.php?GROUP=active&FORMAT=tle";
+        const url = "/api/celestrak-active";
 
         const ctrl = new AbortController();
         const timer = setTimeout(() => ctrl.abort(), 20000);
