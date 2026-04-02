@@ -366,7 +366,19 @@
     </div>
   </div>
 
-<script src="./assets/vendor/satellite.min.js"></script>
+<script>
+  window.HVRX_DEPENDENCIES = {
+    satelliteReady: false,
+    satelliteError: null
+  };
+</script>
+<script
+  src="https://cdn.jsdelivr.net/npm/satellite.js@5.0.1/dist/satellite.min.js"
+  crossorigin="anonymous"
+  referrerpolicy="no-referrer"
+  onload="window.HVRX_DEPENDENCIES.satelliteReady = !!window.satellite; console.log('satellite.js loaded', !!window.satellite);"
+  onerror="window.HVRX_DEPENDENCIES.satelliteReady = false; window.HVRX_DEPENDENCIES.satelliteError = 'CDN load failed'; console.error('satellite.js failed to load from CDN');"
+></script>
 <script type="importmap">
 {
   "imports": {
@@ -379,7 +391,7 @@
   import * as THREE from "three";
   import { OrbitControls } from "https://cdn.jsdelivr.net/npm/three@0.148.0/examples/jsm/controls/OrbitControls.js";
   const satellite = window.satellite || null;
-  console.log("satellite.js loaded", !!satellite);
+  console.log("satellite.js loaded", !!satellite, window.HVRX_DEPENDENCIES?.satelliteError || "");
 
   (function () {
     "use strict";
@@ -1104,7 +1116,9 @@
       earthLoadPromise = (async () => {
         if (!satellite){
           setStatus("SAT DISABLED");
-          alert("satellite.js is not loaded, so satellites are disabled.");
+          const reason = window.HVRX_DEPENDENCIES?.satelliteError || "satellite.js did not initialize";
+          console.error("satellite.js unavailable:", reason);
+          alert("satellite.js is not loaded, so Earth satellite tracking is disabled. Reason: " + reason);
           return;
         }
 
