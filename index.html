@@ -252,12 +252,216 @@
       .panel.left{ width:340px; }
       .panel.planet{ display:none; }
     }
+
+    body.mobile-ui{
+      overflow:hidden;
+      touch-action:manipulation;
+    }
+    body.mobile-ui .panel{
+      top:auto;
+      left:12px;
+      right:12px;
+      width:auto !important;
+      max-width:none;
+      bottom:88px;
+      max-height:calc(100vh - 156px);
+      border-radius:18px;
+      display:none;
+      z-index:35;
+    }
+    body.mobile-ui .panel.open{
+      display:block;
+    }
+    body.mobile-ui .panel.left,
+    body.mobile-ui .panel.right,
+    body.mobile-ui .panel.planet{
+      right:12px;
+      left:12px;
+    }
+    body.mobile-ui .panel .panelBody{
+      max-height:calc(100vh - 250px);
+      overflow:auto;
+      -webkit-overflow-scrolling:touch;
+    }
+    body.mobile-ui .panel.right{
+      bottom:88px;
+      height:auto;
+    }
+    body.mobile-ui .panel.planet{
+      bottom:88px;
+    }
+    body.mobile-ui #hud{
+      left:12px;
+      right:12px;
+      bottom:12px;
+      transform:none;
+      border-radius:18px;
+      justify-content:space-between;
+      gap:8px;
+      padding:10px 12px;
+      flex-wrap:wrap;
+      z-index:25;
+    }
+    body.mobile-ui #hud .k,
+    body.mobile-ui #hud .v{
+      font-size:11px;
+    }
+    #mobileTopbar,
+    #mobileActions,
+    #mobileBackdrop{
+      display:none;
+    }
+    body.mobile-ui #mobileTopbar{
+      display:flex;
+      position:fixed;
+      left:12px;
+      right:12px;
+      top:12px;
+      z-index:25;
+      align-items:center;
+      justify-content:space-between;
+      gap:12px;
+      padding:12px 14px;
+      border-radius:16px;
+      background:rgba(10, 14, 28, 0.74);
+      border:1px solid rgba(120,160,255,.18);
+      color:var(--text);
+      box-shadow:var(--shadow);
+      backdrop-filter: blur(12px);
+      -webkit-backdrop-filter: blur(12px);
+    }
+    #mobileTopbar .mobileBrand{
+      min-width:0;
+    }
+    #mobileTopbar .mobileBrandTitle{
+      font-size:12px;
+      font-weight:800;
+      letter-spacing:1.2px;
+      text-transform:uppercase;
+      white-space:nowrap;
+      overflow:hidden;
+      text-overflow:ellipsis;
+    }
+    #mobileTopbar .mobileBrandSub{
+      margin-top:4px;
+      font-size:10px;
+      color:var(--muted);
+      white-space:nowrap;
+      overflow:hidden;
+      text-overflow:ellipsis;
+    }
+    #mobileTopbar .mobileStat{
+      flex:none;
+      text-align:right;
+    }
+    #mobileTopbar .mobileStatLabel{
+      font-size:10px;
+      color:var(--muted);
+      text-transform:uppercase;
+      letter-spacing:.8px;
+    }
+    #mobileTopbar .mobileStatValue{
+      margin-top:4px;
+      font-size:12px;
+      font-weight:800;
+      color:var(--text);
+      max-width:140px;
+      white-space:nowrap;
+      overflow:hidden;
+      text-overflow:ellipsis;
+    }
+    body.mobile-ui #mobileActions{
+      display:grid;
+      grid-template-columns:repeat(3, 1fr);
+      gap:10px;
+      position:fixed;
+      left:12px;
+      right:12px;
+      bottom:76px;
+      z-index:26;
+    }
+    .mobileActionBtn{
+      appearance:none;
+      border:1px solid rgba(120,160,255,.18);
+      background:rgba(10, 14, 28, 0.76);
+      color:var(--text);
+      border-radius:14px;
+      padding:12px 10px;
+      font:inherit;
+      font-size:11px;
+      font-weight:800;
+      letter-spacing:.8px;
+      text-transform:uppercase;
+      box-shadow:var(--shadow);
+      backdrop-filter: blur(12px);
+      -webkit-backdrop-filter: blur(12px);
+      min-height:48px;
+    }
+    .mobileActionBtn.active{
+      border-color:rgba(0,230,255,.34);
+      box-shadow:0 0 0 1px rgba(0,230,255,.18) inset, var(--shadow);
+    }
+    body.mobile-ui #mobileBackdrop{
+      display:block;
+      position:fixed;
+      inset:0;
+      background:rgba(0,0,0,.35);
+      opacity:0;
+      pointer-events:none;
+      transition:opacity .18s ease;
+      z-index:24;
+    }
+    body.mobile-ui.mobile-panel-open #mobileBackdrop{
+      opacity:1;
+      pointer-events:auto;
+    }
+    body.mobile-ui input,
+    body.mobile-ui textarea,
+    body.mobile-ui select,
+    body.mobile-ui button{
+      font-size:16px;
+    }
+    body.mobile-ui .btn,
+    body.mobile-ui .btn.secondary,
+    body.mobile-ui .mobileActionBtn{
+      min-height:46px;
+    }
+    body.mobile-ui .satName{
+      max-width:calc(100vw - 120px);
+    }
+
+    @media (max-width: 980px){
+      body:not(.mobile-ui) .panel.right{ display:none; }
+      body:not(.mobile-ui) .panel.left{ width:340px; }
+      body:not(.mobile-ui) .panel.planet{ display:none; }
+    }
+
   </style>
 </head>
 
 <body>
   <div id="app">
     <canvas id="c"></canvas>
+
+    <div id="mobileBackdrop" aria-hidden="true"></div>
+
+    <div id="mobileTopbar" aria-hidden="true">
+      <div class="mobileBrand">
+        <div class="mobileBrandTitle">HVRX Orbital Platform</div>
+        <div class="mobileBrandSub">Adaptive mobile controls enabled</div>
+      </div>
+      <div class="mobileStat">
+        <div class="mobileStatLabel">Selected</div>
+        <div class="mobileStatValue" id="mobileSelectedName">—</div>
+      </div>
+    </div>
+
+    <div id="mobileActions" aria-hidden="true">
+      <button class="mobileActionBtn" type="button" data-panel="left">Planner</button>
+      <button class="mobileActionBtn" type="button" data-panel="right">Catalog</button>
+      <button class="mobileActionBtn" type="button" data-panel="planet">Body</button>
+    </div>
+
 
     <div class="panel left">
       <div class="panelHeader">
@@ -400,6 +604,7 @@
     const statusEl = el("status");
     const satCountEl = el("satCount");
     const selectedNameEl = el("selectedName");
+    const mobileSelectedNameEl = el("mobileSelectedName");
     const satListEl = el("satList");
     const searchEl = el("search");
     const catalogNoteEl = el("catalogNote");
@@ -422,6 +627,7 @@
     function setStatus(s){ if (statusEl) statusEl.textContent = s; }
     function setSelectedName(s){
       if (selectedNameEl) selectedNameEl.textContent = s;
+      if (mobileSelectedNameEl) mobileSelectedNameEl.textContent = s;
       if (infoName) infoName.textContent = s;
     }
     function updateSatCount(n){ if (satCountEl) satCountEl.textContent = String(n); }
@@ -436,6 +642,59 @@
       a.click();
       a.remove();
       URL.revokeObjectURL(url);
+    }
+
+    function getDeviceProfile(){
+      const smallScreen = window.matchMedia("(max-width: 980px)").matches;
+      const coarsePointer = window.matchMedia("(pointer: coarse)").matches;
+      const narrowHeight = window.innerHeight < 820;
+      const reducedMotion = window.matchMedia("(prefers-reduced-motion: reduce)").matches;
+      return {
+        smallScreen,
+        coarsePointer,
+        narrowHeight,
+        reducedMotion,
+        mobileLike: smallScreen || coarsePointer
+      };
+    }
+
+    let deviceProfile = getDeviceProfile();
+    let activeMobilePanel = null;
+
+    function applyDeviceProfile(){
+      deviceProfile = getDeviceProfile();
+      document.body.classList.toggle("mobile-ui", deviceProfile.mobileLike);
+      document.body.classList.toggle("desktop-ui", !deviceProfile.mobileLike);
+
+      if (!deviceProfile.mobileLike){
+        closeMobilePanels();
+      }
+    }
+
+    function closeMobilePanels(){
+      activeMobilePanel = null;
+      document.body.classList.remove("mobile-panel-open");
+
+      document.querySelectorAll(".panel").forEach((panel) => panel.classList.remove("open"));
+      document.querySelectorAll(".mobileActionBtn").forEach((btn) => btn.classList.remove("active"));
+    }
+
+    function openMobilePanel(panelName){
+      if (!deviceProfile.mobileLike) return;
+      const panel = document.querySelector(".panel." + panelName);
+      if (!panel) return;
+
+      const willClose = activeMobilePanel === panelName;
+      closeMobilePanels();
+      if (willClose) return;
+
+      activeMobilePanel = panelName;
+      panel.classList.add("open");
+      document.body.classList.add("mobile-panel-open");
+
+      document.querySelectorAll(".mobileActionBtn").forEach((btn) => {
+        btn.classList.toggle("active", btn.dataset.panel === panelName);
+      });
     }
 
     // ---------- Hard dependency checks ----------
@@ -460,7 +719,8 @@
     // ---------- Three.js setup ----------
     const canvas = el("c");
     const renderer = new THREE.WebGLRenderer({ canvas, antialias:true, alpha:true });
-    renderer.setPixelRatio(Math.min(2, window.devicePixelRatio || 1));
+    applyDeviceProfile();
+    renderer.setPixelRatio(deviceProfile.mobileLike ? 1 : Math.min(2, window.devicePixelRatio || 1));
     renderer.setSize(window.innerWidth, window.innerHeight);
 
     const scene = new THREE.Scene();
@@ -469,7 +729,10 @@
 
     const controls = new OrbitControls(camera, renderer.domElement);
     controls.enableDamping = true;
-    controls.dampingFactor = 0.06;
+    controls.dampingFactor = deviceProfile.mobileLike ? 0.09 : 0.06;
+    controls.rotateSpeed = deviceProfile.mobileLike ? 0.8 : 1;
+    controls.zoomSpeed = deviceProfile.mobileLike ? 0.9 : 1;
+    controls.enablePan = !deviceProfile.mobileLike;
     controls.target.set(0,0,0);
     controls.minDistance = 140;
     controls.maxDistance = 800;
@@ -481,7 +744,7 @@
 
     // Stars
     const starGeo = new THREE.BufferGeometry();
-    const starCount = 2000;
+    const starCount = deviceProfile.mobileLike ? 700 : 2000;
     const starPos = new Float32Array(starCount * 3);
     for (let i=0;i<starCount;i++){
       const r = 2200 + Math.random()*1200;
@@ -967,7 +1230,7 @@
         const row = document.createElement("div");
         row.className = "satItem";
         row.innerHTML = `<div class="satName">${escapeHtml(s.name)} <span style="color:rgba(159,179,217,.8);font-weight:700">(${escapeHtml(String(s.norad))})</span></div><div class="pill">TRACK</div>`;
-        row.addEventListener("click", () => selectSatByNorad(String(s.norad)));
+        row.addEventListener("click", () => { selectSatByNorad(String(s.norad)); if (deviceProfile.mobileLike) closeMobilePanels(); });
         satListEl.appendChild(row);
       }
     }
@@ -1374,6 +1637,7 @@
       }
 
       launchOut.value = lines.join("\n");
+      if (deviceProfile.mobileLike) openMobilePanel("left");
     }
 
     // Wire UI
@@ -1392,6 +1656,12 @@
 
     searchEl.addEventListener("input", renderSatList);
     bodySelectEl.addEventListener("change", onBodyChange);
+
+    document.querySelectorAll(".mobileActionBtn").forEach((btn) => {
+      btn.addEventListener("click", () => openMobilePanel(btn.dataset.panel));
+    });
+
+    el("mobileBackdrop")?.addEventListener("click", closeMobilePanels);
 
     // Load initial body
     if (!planetMesh) buildFallbackEarth();
@@ -1424,6 +1694,15 @@
     requestAnimationFrame(animate);
 
     window.addEventListener("resize", () => {
+      const wasMobile = deviceProfile.mobileLike;
+      applyDeviceProfile();
+      if (wasMobile !== deviceProfile.mobileLike){
+        renderer.setPixelRatio(deviceProfile.mobileLike ? 1 : Math.min(2, window.devicePixelRatio || 1));
+        controls.enablePan = !deviceProfile.mobileLike;
+        controls.rotateSpeed = deviceProfile.mobileLike ? 0.8 : 1;
+        controls.zoomSpeed = deviceProfile.mobileLike ? 0.9 : 1;
+        controls.dampingFactor = deviceProfile.mobileLike ? 0.09 : 0.06;
+      }
       camera.aspect = window.innerWidth / window.innerHeight;
       camera.updateProjectionMatrix();
       renderer.setSize(window.innerWidth, window.innerHeight);
