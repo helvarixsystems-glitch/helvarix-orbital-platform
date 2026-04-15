@@ -597,11 +597,6 @@
 
   (function () {
     "use strict";
-  const satellite = window.satellite || null;
-  console.log("satellite.js loaded", !!satellite, window.HVRX_DEPENDENCIES?.satelliteError || "");
-
-  (function () {
-    "use strict";
 
     // ---------- UI helpers ----------
     const el = (id) => document.getElementById(id);
@@ -1382,7 +1377,8 @@
       earthLoadPromise = (async () => {
         if (!satellite){
           setStatus("SAT DISABLED");
-          throw new Error("satellite.js is not loaded. Reason: " + (window.HVRX_DEPENDENCIES?.satelliteError || "Unknown load error"));
+          alert("satellite.js is not loaded, so Earth satellite tracking is disabled. Reason: " + (window.HVRX_DEPENDENCIES?.satelliteError || "Unknown load error"));
+          return;
         }
 
         setStatus("LOADING CATALOG…");
@@ -1391,54 +1387,31 @@
         clearTrack();
 
         const url = "/api/celestrak-active";
+
         const ctrl = new AbortController();
-        const timer = setTimeout(() => ctrl.abort("catalog timeout"), 45000);
+        const timer = setTimeout(() => ctrl.abort(), 20000);
 
         let res;
         try {
           res = await fetch(url, { cache: "no-store", signal: ctrl.signal });
-        } catch (error) {
-          if (error && error.name === "AbortError") {
-            throw new Error("Catalog request timed out after 45 seconds. This usually means the Cloudflare Pages Function did not return data in time.");
-          }
-          throw error;
         } finally {
           clearTimeout(timer);
         }
 
-        if (!res.ok) {
-          let detail = "";
-          try {
-            detail = await res.text();
-          } catch {}
-          throw new Error("Catalog HTTP " + res.status + (detail ? ": " + detail.slice(0, 300) : ""));
-        }
+        if (!res.ok) throw new Error("Catalog HTTP " + res.status);
 
-        const raw = await res.json();
-        const items = Array.isArray(raw?.items) ? raw.items : [];
-
-        if (!items.length) {
-          throw new Error("Catalog loaded, but returned zero usable satellite records.");
-        }
+        const text = await res.text();
+        const items = parseTleText(text);
 
         sats = items.map(it => {
           const sr = satellite.twoline2satrec(it.l1, it.l2);
           const inclDeg = sr.inclo * 180 / Math.PI;
           return { name: it.name, norad: it.norad, satrec: sr, inclDeg, meshIndex: -1 };
-        }).filter(it => Number.isFinite(it?.inclDeg));
-
-        if (!sats.length) {
-          throw new Error("Catalog records were received, but satellite.js could not parse any of them.");
-        }
+        });
 
         buildSatInstancedMesh(sats.length);
         updateSatCount(sats.length);
         catalogNoteEl.textContent = "Catalog: Earth / active (" + sats.length + " objects)";
-        console.log("Loaded Earth active catalog", {
-          count: sats.length,
-          source: raw?.source || "unknown",
-          format: raw?.format || "unknown"
-        });
         setStatus("READY");
         renderSatList();
       })();
