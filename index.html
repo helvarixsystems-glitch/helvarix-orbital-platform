@@ -571,46 +571,27 @@
   </div>
 
 <script>
-  window.HVRX_DEPENDENCIES = {
+  window.HVRX_DEPENDENCIES = window.HVRX_DEPENDENCIES || {
     satelliteReady: false,
     satelliteError: null
   };
 </script>
-
 <script
-  src="./assets/vendor/satellite.min.js?v=3"
-  defer
-  onload="window.HVRX_DEPENDENCIES.satelliteReady = !!window.satellite; console.log('satellite.js loaded', !!window.satellite);"
-  onerror="window.HVRX_DEPENDENCIES.satelliteReady = false; window.HVRX_DEPENDENCIES.satelliteError = 'Local vendor load failed'; console.error('satellite.js failed to load from local vendor file');"
+  src="https://unpkg.com/satellite.js@5.0.0/dist/satellite.min.js"
+  onload="window.HVRX_DEPENDENCIES.satelliteReady = !!window.satellite; console.log('satellite.js loaded', !!window.satellite, window.HVRX_DEPENDENCIES.satelliteError || '');"
+  onerror="window.HVRX_DEPENDENCIES.satelliteReady = false; window.HVRX_DEPENDENCIES.satelliteError = 'CDN load failed'; console.error('satellite.js failed to load from CDN');"
 ></script>
+<script type="importmap">
+{
+  "imports": {
+    "three": "https://cdn.jsdelivr.net/npm/three@0.148.0/build/three.module.js"
+  }
+}
+</script>
 
 <script type="module">
-  import * as THREE from "./assets/vendor/three.module.js?v=3";
-  import { OrbitControls } from "./assets/vendor/OrbitControls.js?v=3";
-
-  async function waitForSatellite(timeoutMs = 5000) {
-    const start = Date.now();
-    while (!window.satellite) {
-      if (Date.now() - start > timeoutMs) {
-        throw new Error(
-          window.HVRX_DEPENDENCIES?.satelliteError ||
-          "satellite.js did not become available in time"
-        );
-      }
-      await new Promise((resolve) => setTimeout(resolve, 50));
-    }
-    return window.satellite;
-  }
-
-  const satellite = await waitForSatellite();
-  console.log(
-    "satellite.js loaded",
-    !!satellite,
-    window.HVRX_DEPENDENCIES?.satelliteError || ""
-  );
-
-  (function () {
-    "use strict";
+  import * as THREE from "three";
+  import { OrbitControls } from "https://cdn.jsdelivr.net/npm/three@0.148.0/examples/jsm/controls/OrbitControls.js";
   const satellite = window.satellite || null;
   console.log("satellite.js loaded", !!satellite, window.HVRX_DEPENDENCIES?.satelliteError || "");
 
@@ -1417,20 +1398,39 @@
           clearTimeout(timer);
         }
 
-        if (!res.ok) throw new Error("Catalog HTTP " + res.status);
+        if (!res.ok) {
+          let detail = "";
+          try {
+            detail = await res.text();
+          } catch {}
+          throw new Error("Catalog HTTP " + res.status + (detail ? ": " + detail.slice(0, 300) : ""));
+        }
 
-        const text = await res.text();
-        const items = parseTleText(text);
+        const raw = await res.json();
+        const items = Array.isArray(raw?.items) ? raw.items : [];
+
+        if (!items.length) {
+          throw new Error("Catalog loaded, but returned zero usable satellite records.");
+        }
 
         sats = items.map(it => {
           const sr = satellite.twoline2satrec(it.l1, it.l2);
           const inclDeg = sr.inclo * 180 / Math.PI;
           return { name: it.name, norad: it.norad, satrec: sr, inclDeg, meshIndex: -1 };
-        });
+        }).filter(it => Number.isFinite(it?.inclDeg));
+
+        if (!sats.length) {
+          throw new Error("Catalog records were received, but satellite.js could not parse any of them.");
+        }
 
         buildSatInstancedMesh(sats.length);
         updateSatCount(sats.length);
         catalogNoteEl.textContent = "Catalog: Earth / active (" + sats.length + " objects)";
+        console.log("Loaded Earth active catalog", {
+          count: sats.length,
+          source: raw?.source || "unknown",
+          format: raw?.format || "unknown"
+        });
         setStatus("READY");
         renderSatList();
       })();
