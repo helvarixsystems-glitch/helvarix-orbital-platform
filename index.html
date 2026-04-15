@@ -597,6 +597,11 @@
 
   (function () {
     "use strict";
+  const satellite = window.satellite || null;
+  console.log("satellite.js loaded", !!satellite, window.HVRX_DEPENDENCIES?.satelliteError || "");
+
+  (function () {
+    "use strict";
 
     // ---------- UI helpers ----------
     const el = (id) => document.getElementById(id);
@@ -1377,8 +1382,7 @@
       earthLoadPromise = (async () => {
         if (!satellite){
           setStatus("SAT DISABLED");
-          alert("satellite.js is not loaded, so Earth satellite tracking is disabled. Reason: " + (window.HVRX_DEPENDENCIES?.satelliteError || "Unknown load error"));
-          return;
+          throw new Error("satellite.js is not loaded. Reason: " + (window.HVRX_DEPENDENCIES?.satelliteError || "Unknown load error"));
         }
 
         setStatus("LOADING CATALOG…");
@@ -1387,13 +1391,17 @@
         clearTrack();
 
         const url = "/api/celestrak-active";
-
         const ctrl = new AbortController();
-        const timer = setTimeout(() => ctrl.abort(), 20000);
+        const timer = setTimeout(() => ctrl.abort("catalog timeout"), 45000);
 
         let res;
         try {
           res = await fetch(url, { cache: "no-store", signal: ctrl.signal });
+        } catch (error) {
+          if (error && error.name === "AbortError") {
+            throw new Error("Catalog request timed out after 45 seconds. This usually means the Cloudflare Pages Function did not return data in time.");
+          }
+          throw error;
         } finally {
           clearTimeout(timer);
         }
