@@ -571,27 +571,39 @@
   </div>
 
 <script>
-  window.HVRX_DEPENDENCIES = window.HVRX_DEPENDENCIES || {
+  window.HVRX_DEPENDENCIES = {
     satelliteReady: false,
     satelliteError: null
   };
 </script>
+
 <script
-  src="https://unpkg.com/satellite.js@5.0.0/dist/satellite.min.js"
-  onload="window.HVRX_DEPENDENCIES.satelliteReady = !!window.satellite; console.log('satellite.js loaded', !!window.satellite, window.HVRX_DEPENDENCIES.satelliteError || '');"
-  onerror="window.HVRX_DEPENDENCIES.satelliteReady = false; window.HVRX_DEPENDENCIES.satelliteError = 'CDN load failed'; console.error('satellite.js failed to load from CDN');"
+  src="./assets/vendor/satellite.min.js?v=3"
+  defer
+  onload="window.HVRX_DEPENDENCIES.satelliteReady = !!window.satellite; console.log('satellite.js loaded', !!window.satellite);"
+  onerror="window.HVRX_DEPENDENCIES.satelliteReady = false; window.HVRX_DEPENDENCIES.satelliteError = 'Local vendor load failed'; console.error('satellite.js failed to load from local vendor file');"
 ></script>
-<script type="importmap">
-{
-  "imports": {
-    "three": "https://cdn.jsdelivr.net/npm/three@0.148.0/build/three.module.js"
-  }
-}
-</script>
 
 <script type="module">
-  import * as THREE from "three";
-  import { OrbitControls } from "https://cdn.jsdelivr.net/npm/three@0.148.0/examples/jsm/controls/OrbitControls.js";
+  import * as THREE from "./assets/vendor/three.module.js?v=3";
+  import { OrbitControls } from "./assets/vendor/OrbitControls.js?v=3";
+
+  async function waitForSatellite(timeoutMs = 5000) {
+    const start = Date.now();
+    while (!window.satellite) {
+      if (Date.now() - start > timeoutMs) {
+        throw new Error(window.HVRX_DEPENDENCIES?.satelliteError || "satellite.js did not become available in time");
+      }
+      await new Promise((resolve) => setTimeout(resolve, 50));
+    }
+    return window.satellite;
+  }
+
+  const satellite = await waitForSatellite();
+  console.log("satellite.js loaded", !!satellite, window.HVRX_DEPENDENCIES?.satelliteError || "");
+
+  (function () {
+    "use strict";
   const satellite = window.satellite || null;
   console.log("satellite.js loaded", !!satellite, window.HVRX_DEPENDENCIES?.satelliteError || "");
 
